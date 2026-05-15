@@ -1,0 +1,6 @@
+streamlit
+PyMySQL
+pandas
+requests
+openpyxl
+io
