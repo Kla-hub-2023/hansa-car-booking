@@ -127,10 +127,120 @@ elif "Booker" in choice:
                     if 'db' in locals() and db.open:
                         db.close()
 
-# หน้าที่ 3: Dispatcher
+# หน้าที่ 3: Dispatcher (ดึงงานมาโชว์ + เลือกคนขับ + กดจ่ายงานลง Cloud)
 elif "Dispatcher" in choice:
     st.title("🖥️ หน้าจัดการงาน (Dispatcher)")
-    st.write("🔧 กำลังเตรียมโครงสร้างตารางแสดงรายการข้อมูล เพื่อให้คัดเลือกคนขับรถและส่งข้อความแจ้งเตือนผ่าน LINE")
+    st.subheader("📋 รายการจองรถทั้งหมดที่รอจัดสรรคนขับ")
+
+    # --- ส่วนที่ 1: ดึงงานจากคลาวด์มาแสดงผล ---
+    try:
+        db = get_connection()
+        
+        # 1.1 ดึงงานจองรถทั้งหมด
+        query_bookings = "SELECT id, passenger_name, pickup_location, dropoff_location, booking_time, status, driver_id FROM bookings ORDER BY booking_time DESC"
+        df_bookings = pd.read_sql(query_bookings, db)
+        
+        # 1.2 ดึงรายชื่อผู้ใช้ที่เป็น 'driver' ทั้งหมดมาทำเป็นตัวเลือก
+        with db.cursor() as cursor:
+            cursor.execute("SELECT line_user_id, name FROM users WHERE role = 'driver'")
+            drivers_list = cursor.fetchall()
+            
+        # แปลงรายชื่อคนขับเป็นดีกชันนารี { 'ชื่อคนขับ (ID)': 'ID' } เพื่อเอาไปใส่ใน Selectbox
+        driver_options = {f"🚖 {d[1]} ({d[0]})": d[0] for d in drivers_list}
+        
+    except Exception as e:
+        st.error(f"❌ ไม่สามารถดึงข้อมูลจากฐานข้อมูลได้: {e}")
+        df_bookings = pd.DataFrame()
+        driver_options = {}
+    finally:
+        if 'db' in locals() and db.open:
+            db.close()
+
+    # แสดงตารางงานปัจจุบันให้ Dispatcher เห็นบนหน้าจอ
+    if not df_bookings.empty:
+        st.write("### 📊 ตารางสถานะงานปัจจุบัน")
+        # ตกแต่งหน้าตาตารางของ Pandas ก่อนโชว์
+        st.dataframe(df_bookings, use_container_width=True)
+        
+        st.write("---")
+        st.write("### 🎯 ฟังก์ชันการจ่ายงานให้คนขับ")
+        
+        # กรองเอาเฉพาะงานที่ยังค้างสถานะ 'Pending' เพื่อเอามาเข้าเมนูจ่ายงาน
+        pending_jobs = df_bookings[df_bookings['status'] == 'Pending']
+        
+        if not pending_jobs.empty:
+            # สร้างลิสต์รายการงานเพื่อให้เลือกจากรหัส ID จอง เช่น "ID: 1 | คุณหรรษา (สนามบินสุวรรณภูมิ -> โรงแรมฮันซ่า)"
+            job_options = {
+                f"🆔 ใบงานที่ {row['id']} | คุณ {row['passenger_name']} ({row['pickup_location']} ➡️ {row['dropoff_location']})": row['id']
+                for _, row in pending_jobs.iterrows()
+            }
+            
+            # วางกล่องคอนโทรลในรูปแบบคอลัมน์ซ้ายขวาให้สวยงาม
+            col_job, col_drv, col_btn = st.columns([2, 1, 1])
+            
+            with col_job:
+                selected_job_text = st.selectbox("1️⃣ เลือกใบงานที่ต้องการจัดสรร", options=list(job_options.keys()))
+                job_id_to_update = job_options[selected_job_text]
+                
+                # ดึงข้อมูลของงานที่เลือกไว้เตรียมไปส่ง LINE
+                selected_job_data = pending_jobs[pending_jobs['id'] == job_id_to_update].iloc[0]
+            
+            with col_drv:
+                if driver_options:
+                    selected_driver_text = st.selectbox("2️⃣ เลือกคนขับรถที่จะส่งงาน", options=list(driver_options.keys()))
+                    driver_id_to_assign = driver_options[selected_driver_text]
+                else:
+                    st.warning("⚠️ ไม่มีรายชื่อคนขับในระบบ")
+                    driver_id_to_assign = None
+                    
+            with col_btn:
+                st.write(" ") # เว้นช่องว่างให้ปุ่มตรงกับกล่องเลือก
+                st.write(" ")
+                btn_assign = st.button("🚀 กดจ่ายงานและส่ง LINE")
+                
+            # --- ส่วนที่ 2: เมื่อกดปุ่มจ่ายงาน ---
+            if btn_assign:
+                if not driver_id_to_assign:
+                    st.error("❌ ไม่สามารถจ่ายงานได้ เนื่องจากไม่ได้เลือกคนขับรถครับ")
+                else:
+                    with st.spinner("กำลังอัปเดตสถานะงานและส่งข้อความเข้า LINE..."):
+                        try:
+                            db = get_connection()
+                            with db.cursor() as cursor:
+                                # SQL สำหรับอัปเดตสถานะเป็น 'Assigned' และบันทึกรหัสคนขับลงไป
+                                sql_update = """
+                                    UPDATE bookings 
+                                    SET status = 'Assigned', driver_id = %s, dispatcher_id = %s 
+                                    WHERE id = %s
+                                """
+                                # current_id คือ ID ของ Dispatcher/Admin ที่กำลังกดปุ่มนี้อยู่
+                                cursor.execute(sql_update, (driver_id_to_assign, current_id, job_id_to_update))
+                                db.commit()
+                                
+                            # ยิงข้อความแจ้งเตือนเข้า LINE Push API หาคนขับคนนั้นทันที
+                            msg_to_line = (
+                                f"🔔 มีงานใหม่เข้าครับ!\n"
+                                f"📋 ใบงานที่: {job_id_to_update}\n"
+                                f"👤 ลูกค้า: {selected_job_data['passenger_name']}\n"
+                                f"📍 จุดรับ: {selected_job_data['pickup_location']}\n"
+                                f"🏁 จุดส่ง: {selected_job_data['dropoff_location']}\n"
+                                f"📅 เวลาเดินทาง: {selected_job_data['booking_time']}\n"
+                                f"รบกวนตรวจสอบและเข้าหน้าเว็บเพื่อกดรับงานด้วยครับ"
+                            )
+                            send_line_message(msg_to_line, driver_id_to_assign)
+                            
+                            st.success(f"🎉 จ่ายงานใบงานที่ {job_id_to_update} ให้คนขับเรียบร้อย! อัปเดตคลาวด์และส่ง LINE แจ้งเตือนแล้ว")
+                            st.rerun() # สั่งรีเฟรชหน้าจอทันทีเพื่ออัปเดตตัวเลขตาราง
+                            
+                        except Exception as e:
+                            st.error(f"❌ เกิดข้อผิดพลาดระหว่างจ่ายงาน: {e}")
+                        finally:
+                            if 'db' in locals() and db.open:
+                                db.close()
+        else:
+            st.success("✨ ยอดเยี่ยมมาก! ตอนนี้ไม่มีงานจองค้างสถานะ Pending (จ่ายงานครบหมดทุกใบแล้วครับ)")
+    else:
+        st.info("ℹ️ ปัจจุบันยังไม่มีประวัติการจองรถในฐานข้อมูลคลาวด์")
 
 # หน้าที่ 4: Driver
 elif "Driver" in choice:
