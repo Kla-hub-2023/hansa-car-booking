@@ -29,7 +29,7 @@ def check_permission(user_id):
     with db.cursor() as cursor:
         cursor.execute("SELECT role FROM users WHERE line_user_id = %s", (user_id,))
         result = cursor.fetchone()
-    return result['role'] if result else "Guest"
+    return result[0] if result else "Guest"
 
 st.set_page_config(page_title="ระบบจัดการรถ Multi-Role", layout="wide")
 
