@@ -100,7 +100,7 @@ elif "Booker" in choice:
             booking_time_input = st.time_input("เลือกเวลา")
         
         combined_datetime = dt_module.datetime.combine(booking_date, booking_time_input)
-        submit_button = st.form_submit_with_button("💾 บันทึกข้อมูลการจอง")
+        submit_button = st.form_submit_button("💾 บันทึกข้อมูลการจอง")
 
     # ส่วนของการประมวลผลเมื่อกดปุ่มบันทึก
     if submit_button:
