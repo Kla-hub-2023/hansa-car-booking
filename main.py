@@ -40,25 +40,26 @@ def check_permission(user_id):
 
 st.set_page_config(page_title="ระบบจัดการรถ Multi-Role", layout="wide")
 
-# --- ระบบล็อกอินอัจฉริยะ (เสถียร 100% ป้องกันการล้างค่าตอน Rerun) ---
+# --- ระบบล็อกอินอัจฉริยะแบบนิรภัย (ล็อกสิทธิ์หนาแน่น 100% ไม่หลุดตอนกดปุ่ม) ---
 if "logged_in_user" not in st.session_state:
     st.session_state["logged_in_user"] = "admin01"
 
 st.sidebar.title("🔐 เข้าสู่ระบบ")
 
-# ป้อนค่า value คืนกลับไปทุกรอบ เพื่อป้องกันกล่องข้อความกลายเป็นค่าว่างตอนตารางรีโหลด
-current_id = st.sidebar.text_input(
+# กล่องรับข้อมูลเข้าสู่ระบบ
+input_id = st.sidebar.text_input(
     "ระบุ LINE User ID", 
     value=st.session_state["logged_in_user"],
     key="user_input_key"
 )
 
-# อัปเดตความจำหลักให้ตรงกับที่พิมพ์อยู่เสมอ
-st.session_state["logged_in_user"] = current_id
+# กลไกนิรภัย: ถ้าผู้ใช้กรอกข้อมูลมา ให้เซ็ตค่าตามที่กรอก แต่ถ้าจังหวะรีโหลดค่าแอบว่าง ให้ใช้ค่าจำเดิม
+if input_id.strip():
+    st.session_state["logged_in_user"] = input_id.strip()
 
-# ดึงไอดีไปตรวจสิทธิ์บน Cloud โดยตัดช่องว่างออก
-user_id_to_check = st.session_state["logged_in_user"].strip()
-user_role = check_permission(user_id_to_check).lower()
+# ดึงไอดีที่ปลอดภัยที่สุดจากตู้เซฟความจำไปตรวจสอบบนคลาวด์
+current_id = st.session_state["logged_in_user"]
+user_role = check_permission(current_id).lower()
 st.sidebar.info(f"สิทธิ์ของคุณคือ: {user_role}")
 
 # --- 3. จัดการรายการเมนูฝั่งซ้ายตามระดับสิทธิ์ ---
