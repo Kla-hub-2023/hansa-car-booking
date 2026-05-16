@@ -9,10 +9,10 @@ import io
 @st.cache_resource
 def get_connection():
     return pymysql.connect(
-        host='127.0.0.1',
-        user='root',
-        password='P@ssw0rd', # ⚠️ แก้จุดนี้
-        database='car_booking_db',
+        host='mysql-22653bef-kla-e55d.c.aivencloud.com',
+        user='avnadmin',
+        password='AVNS_W4Huwc3abQww6NKNlG2', # ⚠️ แก้จุดนี้
+        database='defaultdb',
         autocommit=True,
         cursorclass=pymysql.cursors.DictCursor
     )
