@@ -40,20 +40,24 @@ def check_permission(user_id):
 
 st.set_page_config(page_title="ระบบจัดการรถ Multi-Role", layout="wide")
 
-# --- ระบบล็อกอินอัจฉริยะ (เสถียร 100% ไม่หลุดเมื่อเปลี่ยน Widget) ---
+# --- ระบบล็อกอินอัจฉริยะ (เสถียร 100% ป้องกันการล้างค่าตอน Rerun) ---
 if "logged_in_user" not in st.session_state:
     st.session_state["logged_in_user"] = "admin01"
 
 st.sidebar.title("🔐 เข้าสู่ระบบ")
 
-# ใช้ทางลัด: อ่านและเซ็ตค่าลง Session State โดยตรงผ่านพารามิเตอร์ key
+# ป้อนค่า value คืนกลับไปทุกรอบ เพื่อป้องกันกล่องข้อความกลายเป็นค่าว่างตอนตารางรีโหลด
 current_id = st.sidebar.text_input(
     "ระบุ LINE User ID", 
-    key="logged_in_user"
+    value=st.session_state["logged_in_user"],
+    key="user_input_key"
 )
 
+# อัปเดตความจำหลักให้ตรงกับที่พิมพ์อยู่เสมอ
+st.session_state["logged_in_user"] = current_id
+
 # ดึงไอดีไปตรวจสิทธิ์บน Cloud โดยตัดช่องว่างออก
-user_id_to_check = current_id.strip()
+user_id_to_check = st.session_state["logged_in_user"].strip()
 user_role = check_permission(user_id_to_check).lower()
 st.sidebar.info(f"สิทธิ์ของคุณคือ: {user_role}")
 
