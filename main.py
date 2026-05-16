@@ -43,11 +43,11 @@ st.sidebar.info(f"สิทธิ์ของคุณคือ: {user_role}")
 menu_options = []
 if user_role == "admin":
     menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "🚖 Driver", "✈️ Airport Staff"]
-elif user_role == "Dispatcher":
+elif menu_options == "🖥️ Dispatcher":
     menu_options = ["➕ Booker", "🖥️ Dispatcher", "🚖 Driver", "✈️ Airport Staff"]
 elif user_role == "Driver":
     menu_options = ["🚖 งานของฉัน (Driver)"]
-elif menu == "Booker":
+elif menu_options == "➕ Booker":
     st.title("📋 แบบฟอร์มจองรถ (Booker)")
     st.subheader("กรอกรายละเอียดการเดินทางเพื่อส่งงานให้ผู้จัดสรรรถ")
 
