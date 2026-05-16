@@ -47,8 +47,71 @@ elif user_role == "Dispatcher":
     menu_options = ["➕ Booker", "🖥️ Dispatcher", "🚖 Driver", "✈️ Airport Staff"]
 elif user_role == "Driver":
     menu_options = ["🚖 งานของฉัน (Driver)"]
-elif user_role == "Booker":
-    menu_options = ["➕ คีย์งานจองรถ (Booker)"]
+elif menu == "Booker":
+    st.title("📋 แบบฟอร์มจองรถ (Booker)")
+    st.subheader("กรอกรายละเอียดการเดินทางเพื่อส่งงานให้ผู้จัดสรรรถ")
+
+    # สร้างกล่องฟอร์มสีขาวล้อมรอบให้ดูเป็นระเบียบ
+    with st.form(key="car_booking_form", clear_on_submit=True):
+        st.write("### 🚗 ข้อมูลการเดินทาง")
+        
+        # 1. ช่องกรอกชื่อผู้โดยสาร
+        passenger_name = st.text_input("👤 ชื่อผู้โดยสาร / คณะเดินทาง", placeholder="เช่น คุณสมชาย สายลุย")
+        
+        # 2. ช่องเลือกจุดรับ-จุดส่ง (ปรับเปลี่ยนรายชื่อสถานที่ได้ตามใจชอบเลยครับ)
+        locations = ["สนามบินสุวรรณภูมิ", "สนามบินดอนเมือง", "โรงแรมฮันซ่า", "ตัวเมืองกรุงเทพฯ", "พัทยา", "หัวหิน"]
+        pickup_location = st.selectbox("📍 จุดรับ (Pickup)", options=locations)
+        dropoff_location = st.selectbox("🏁 จุดส่ง (Dropoff)", options=locations)
+        
+        # 3. ช่องเลือกวันและเวลาเดินทาง
+        st.write("📅 วันและเวลาเดินทาง")
+        col1, col2 = st.columns(2)
+        with col1:
+            booking_date = st.date_input("เลือกวันที่")
+        with col2:
+            booking_time_input = st.time_input("เลือกเวลา")
+        
+        # รวมวันและเวลาเข้าด้วยกันเป็นฟอร์แมตที่ MySQL เข้าใจ (YYYY-MM-DD HH:MM:SS)
+        import datetime
+        combined_datetime = datetime.datetime.combine(booking_date, booking_time_input)
+
+        # 4. ปุ่มกดบันทึกข้อมูล
+        submit_button = st.form_submit_with_button("💾 บันทึกข้อมูลการจอง")
+
+    # --- ส่วนของการกดปุ่มเพื่อบันทึกลงฐานข้อมูล Aiven ---
+    if submit_button:
+        # ตรวจเช็กเบื้องต้นก่อนว่าไม่ได้ปล่อยช่องชื่อให้ว่างไว้
+        if not passenger_name.strip():
+            st.error("⚠️ กรุณากรอกชื่อผู้โดยสารก่อนกดบันทึกครับ")
+        elif pickup_location == dropoff_location:
+            st.error("⚠️ จุดรับและจุดส่งห้ามเป็นสถานที่เดียวกันครับ")
+        else:
+            with st.spinner("กำลังเชื่อมต่อฐานข้อมูลและบันทึกข้อมูล..."):
+                try:
+                    # เรียกใช้ฟังก์ชันเชื่อมต่อ DB ที่เราเซ็ตค่าไว้ตอนแรก
+                    db = get_connection()
+                    cursor = db.cursor()
+                    
+                    # คำสั่ง SQL สำหรับยิงข้อมูลเข้าคลาวด์
+                    sql = """
+                        INSERT INTO bookings (passenger_name, pickup_location, dropoff_location, booking_time, status)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """
+                    val = (passenger_name, pickup_location, dropoff_location, combined_datetime, 'Pending')
+                    
+                    cursor.execute(sql, val)
+                    db.commit() # ยืนยันการบันทึกข้อมูลลงแผ่นดิสก์บนคลาวด์
+                    
+                    # แจ้งเตือนความสำเร็จสีเขียวสวยงาม
+                    st.success(f"🎉 บันทึกการจองสำหรับคุณ {passenger_name} เรียบร้อยแล้ว! ข้อมูลถูกส่งเข้าฐานข้อมูลออนไลน์แล้ว")
+                    
+                except Exception as e:
+                    st.error(f"❌ เกิดข้อผิดพลาดระหว่างบันทึกข้อมูล: {e}")
+                finally:
+                    # ปิดสัญญานการเชื่อมต่อเพื่อไม่ให้ฐานข้อมูลค้าง
+                    if 'db' in locals() and db.open:
+                        cursor.close()
+                        db.close()
 elif user_role == "AirportStaff":
     menu_options = ["✈️ ตรวจสอบคิวรถ (Airport Staff)"]
 else:
