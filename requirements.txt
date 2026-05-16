@@ -3,4 +3,3 @@ PyMySQL
 pandas
 requests
 openpyxl
-io
