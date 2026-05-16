@@ -50,22 +50,25 @@ st.sidebar.info(f"สิทธิ์ของคุณคือ: {user_role}")
 
 # --- 3. จัดการรายการเมนูฝั่งซ้ายตามระดับสิทธิ์ ---
 menu_options = []
-if user_role == "admin":
+# เช็กสิทธิ์โดยตัดช่องว่าง และแปลงเป็นตัวพิมพ์เล็กทั้งหมดเพื่อความปลอดภัย
+current_role = user_role.strip().lower()
+
+if current_role == "admin":
     menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "🚖 Driver", "✈️ Airport Staff"]
-elif user_role == "dispatcher":
+elif current_role == "dispatcher":
     menu_options = ["➕ Booker", "🖥️ Dispatcher", "🚖 Driver", "✈️ Airport Staff"]
-elif user_role == "driver":
+elif current_role == "driver":
     menu_options = ["🚖 งานของฉัน (Driver)"]
-elif user_role == "passenger":
+elif current_role == "passenger":
     menu_options = ["➕ Booker"]
-elif user_role == "airportstaff" or user_role == "airport staff":
+elif current_role == "airportstaff" or current_role == "airport staff":
     menu_options = ["✈️ Airport Staff"]
 else:
-    # หากเป็น Guest หรือยังไม่ล็อกอิน
+    # หากยังเป็น Guest หรือหาชื่อไม่เจอในฐานข้อมูล
     st.warning("⚠️ คุณไม่มีสิทธิ์เข้าถึงระบบ หรือยังไม่ได้ระบุรหัส LINE User ID ที่ถูกต้องบนฐานข้อมูล")
-    st.info("💡 ทดสอบระบบ: กรุณากรอก 'admin01' ในช่องระบุ LINE User ID ด้านซ้ายมือเพื่อปลดล็อก")
+    st.info("💡 รหัสที่ระบบตรวจพบตอนนี้คือ: " + f"`{current_id}`" + f" (ระดับสิทธิ์: `{user_role}`)")
     st.stop()
-
+    
 # แสดงปุ่มเลือกเมนูตามรายการสิทธิ์ที่ได้รับกรองแล้วด้านบน
 choice = st.sidebar.radio("เมนูใช้งาน", menu_options)
 
