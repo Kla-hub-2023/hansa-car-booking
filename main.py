@@ -13,8 +13,7 @@ def get_connection():
         user='avnadmin',
         password='AVNS_W4Huwc3abQww6NKNlG2', # ⚠️ แก้จุดนี้
         database='defaultdb',
-        autocommit=True,
-        cursorclass=pymysql.cursors.DictCursor
+        port=23986
     )
 
 def send_line_message(message, target_id):
