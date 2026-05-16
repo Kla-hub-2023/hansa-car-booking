@@ -41,7 +41,7 @@ st.sidebar.info(f"สิทธิ์ของคุณคือ: {user_role}")
 
 # --- 3. จัดการเมนูตามสิทธิ์ (Spec: Admin เห็นหมด, Dispatcher เห็น 3 กลุ่ม) ---
 menu_options = []
-if user_role == "Admin":
+if user_role == "admin":
     menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "🚖 Driver", "✈️ Airport Staff"]
 elif user_role == "Dispatcher":
     menu_options = ["➕ Booker", "🖥️ Dispatcher", "🚖 Driver", "✈️ Airport Staff"]
