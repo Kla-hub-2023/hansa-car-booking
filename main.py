@@ -42,7 +42,7 @@ st.set_page_config(page_title="ระบบจัดการรถ Multi-Role",
 
 # แถบเมนูด้านซ้ายสำหรับเข้าสู่ระบบ
 st.sidebar.title("🔐 เข้าสู่ระบบ")
-current_id = st.sidebar.text_input("ระบุ LINE User ID", value="วาง_รหัส_U_ของคุณที่นี่")
+current_id = st.sidebar.text_input("ระบุ LINE User ID", value="admin01", placeholder="พิมพ์รหัสของคุณที่นี่")
 
 # จัดการแปลงเป็นตัวพิมพ์เล็กเพื่อลดความผิดพลาดในการค้นหาในฐานข้อมูล
 user_role = check_permission(current_id.strip()).lower()
