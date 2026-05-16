@@ -152,16 +152,22 @@ elif "Dispatcher" in choice:
     try:
         db = get_connection()
         
-        # 1.1 ดึงงานจองรถทั้งหมด
-        query_bookings = "SELECT id, passenger_name, pickup_location, dropoff_location, booking_time, status, driver_id FROM bookings ORDER BY booking_time DESC"
-        df_bookings = pd.read_sql(query_bookings, db)
+        # 1.1 แก้ไขจุดนี้: เปลี่ยนจาก pd.read_sql มาใช้ cursor ปกติ เพื่อความเสถียร
+        with db.cursor() as cursor:
+            query_bookings = "SELECT id, passenger_name, pickup_location, dropoff_location, booking_time, status, driver_id FROM bookings ORDER BY booking_time DESC"
+            cursor.execute(query_bookings)
+            bookings_data = cursor.fetchall()
+            
+        # แปลงข้อมูลเป็น DataFrame ด้วยมือแทน ปลอดภัยจาก UserWarning แน่นอน
+        columns = ['id', 'passenger_name', 'pickup_location', 'dropoff_location', 'booking_time', 'status', 'driver_id']
+        df_bookings = pd.DataFrame(bookings_data, columns=columns)
         
         # 1.2 ดึงรายชื่อผู้ใช้ที่เป็น 'driver' ทั้งหมดมาทำเป็นตัวเลือก
         with db.cursor() as cursor:
             cursor.execute("SELECT line_user_id, name FROM users WHERE role = 'driver'")
             drivers_list = cursor.fetchall()
             
-        # แปลงรายชื่อคนขับเป็นดีกชันนารี { 'ชื่อคนขับ (ID)': 'ID' } เพื่อเอาไปใส่ใน Selectbox
+        # แปลงรายชื่อคนขับเป็นดีกชันนารี
         driver_options = {f"🚖 {d[1]} ({d[0]})": d[0] for d in drivers_list}
         
     except Exception as e:
