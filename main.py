@@ -40,23 +40,20 @@ def check_permission(user_id):
 
 st.set_page_config(page_title="ระบบจัดการรถ Multi-Role", layout="wide")
 
-# --- ระบบล็อกอินอัจฉริยะแบบนิรภัย (ตัดช่องว่างออโต้ ป้องกันเว้นวรรคทำพิษ) ---
+# --- ระบบล็อกอินอัจฉริยะแบบนิรภัย (มาตรฐานสากล Streamlit ป้องกันการทับค่า) ---
 if "logged_in_user" not in st.session_state:
     st.session_state["logged_in_user"] = "admin01"
 
 st.sidebar.title("🔐 เข้าสู่ระบบ")
 
-# ใช้กล่องรับค่าปกติ
-input_raw = st.sidebar.text_input(
+# วิธีที่ถูกต้องที่สุด: ผูกกล่องเข้ากับห้องความจำโดยตรงผ่าน key ตัวเดียว (ห้ามใส่ value ซ้ำซ้อน)
+# ท่านี้จะทำให้เวลาคุณกล้าพิมพ์สลับชื่อด้วยมือ ระบบจะอัปเดตความจำทันทีโดยไม่เด้งหลุด
+current_id = st.sidebar.text_input(
     "ระบุ LINE User ID", 
-    value=st.session_state["logged_in_user"]
-)
+    key="logged_in_user"
+).strip()
 
-# ไม้ตาย: ตัดช่องว่าง หน้า-หลัง ทิ้งทันทีด้วย .strip() ก่อนจะเอาไปบันทึกหรือเช็กสิทธิ์
-current_id = input_raw.strip()
-st.session_state["logged_in_user"] = current_id
-
-# ดึงไอดีที่ใสสะอาดไร้เว้นวรรคไปเคาะฐานข้อมูลบนคลาวด์
+# ดึงไอดีที่อัปเดตล่าสุดสด ๆ ไปตรวจสอบสิทธิ์บนคลาวด์ Aiven
 user_role = check_permission(current_id).lower()
 st.sidebar.info(f"สิทธิ์ของคุณคือ: {user_role}")
 
