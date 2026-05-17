@@ -78,8 +78,17 @@ else:
     st.info("💡 รหัสที่ระบบตรวจพบตอนนี้คือ: " + f"`{current_id}`" + f" (ระดับสิทธิ์: `{user_role}`)")
     st.stop()
     
-# แสดงปุ่มเลือกเมนูตามรายการสิทธิ์ที่ได้รับกรองแล้วด้านบน
-choice = st.sidebar.radio("เมนูใช้งาน", menu_options)
+# --- ระบบล็อกความจำเมนู (ป้องกันหน้าจอหายจังหวะ Rerun ตัวเลือกข้างใน) ---
+# 1. ตั้งค่าเริ่มต้นให้จำเมนูแรกสุดที่ดึงมาได้
+if "current_menu_choice" not in st.session_state or st.session_state["current_menu_choice"] not in menu_options:
+    st.session_state["current_menu_choice"] = menu_options[0] if menu_options else ""
+
+# 2. ผูกกล่องเมนูวิทยุฝั่งซ้ายเข้ากับตู้เซฟความจำโดยตรงผ่าน key
+choice = st.sidebar.radio(
+    "เมนูใช้งาน", 
+    options=menu_options, 
+    key="current_menu_choice"
+)
 
 # --- 4. การแสดงเนื้อหาไส้ในของแต่ละเมนูตามหน้าเลือก ---
 
