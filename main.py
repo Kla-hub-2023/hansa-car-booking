@@ -91,10 +91,68 @@ choice = st.sidebar.radio(
 
 # --- 4. การแสดงเนื้อหาไส้ในของแต่ละเมนูตามหน้าเลือก ---
 
-# หน้าที่ 1: Dashboard
+# หน้าที่ 1: Dashboard (เวอร์ชันอัปเกรด ศูนย์ควบคุมสถานการณ์เรียลไทม์)
 if "Dashboard" in choice:
     st.title("🏠 หน้าแรกและภาพรวมระบบ (Dashboard)")
-    st.write(f"สวัสดีครับคุณกล้า สถานะการเชื่อมต่อระบบฐานข้อมูลคลาวด์ Aiven MySQL ปกติดีเยี่ยมครับ")
+    st.markdown(f"สวัสดีครับคุณกล้า สถานะการเชื่อมต่อคลาวด์ **Aiven MySQL ปกติดีเยี่ยม** ครับ")
+    st.write("---")
+
+    # --- ดึงข้อมูลสถิติสด ๆ จาก Cloud ---
+    try:
+        db = get_connection()
+        with db.cursor() as cursor:
+            # 1. นับงานค้าง Pending
+            cursor.execute("SELECT COUNT(*) FROM bookings WHERE status = 'Pending'")
+            count_pending = cursor.fetchone()[0]
+            
+            # 2. นับงานที่จ่ายแล้วแต่อยู่ระหว่างดำเนินการ
+            cursor.execute("SELECT COUNT(*) FROM bookings WHERE status IN ('Assigned', 'Accepted')")
+            count_active = cursor.fetchone()[0]
+            
+            # 3. นับจำนวนคนขับรถทั้งหมดในระบบ
+            cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'driver'")
+            count_drivers = cursor.fetchone()[0]
+            
+            # 4. ดึงงานล่าสุด 5 รายการมาแสดง
+            cursor.execute("SELECT id, passenger_name, pickup_location, dropoff_location, status FROM bookings ORDER BY id DESC LIMIT 5")
+            recent_data = cursor.fetchall()
+            
+        df_recent = pd.DataFrame(recent_data, columns=['ใบงานที่', 'ชื่อผู้โดยสาร', 'จุดรับ', 'จุดส่ง', 'สถานะ'])
+    except Exception as e:
+        count_pending, count_active, count_drivers = 0, 0, 0
+        df_recent = pd.DataFrame()
+    finally:
+        if 'db' in locals() and db.open:
+            db.close()
+
+    # --- ส่วนแสดงผลบนหน้าเว็บ ---
+    # 1. แสดงกล่องสถิติ (Metrics) ด้านบน
+    col_m1, col_m2, col_m3 = st.columns(3)
+    with col_m1:
+        st.metric(label="⏳ ใบงานรอจัดสรร (Pending)", value=count_pending, delta=f"{count_pending} งานค้าง", delta_color="inverse" if count_pending > 0 else "normal")
+    with col_m2:
+        st.metric(label="🚀 รถกำลังปฏิบัติงาน (Active)", value=count_active)
+    with col_m3:
+        st.metric(label="🚖 คนขับรถในระบบทั้งหมด", value=count_drivers)
+
+    st.write("---")
+    
+    # 2. แสดงตารางงานล่าสุดและตารางสรุป
+    col_left, col_right = st.columns([2, 1])
+    
+    with col_left:
+        st.write("### ⏱️ รายการจองรถล่าสุด 5 รายการ")
+        if not df_recent.empty:
+            st.dataframe(df_recent, width='stretch')
+        else:
+            st.info("ยังไม่มีประวัติการจองในระบบ")
+            
+    with col_right:
+        st.write("### 💡 แนะนำการใช้งาน")
+        st.info("คุณกล้าสามารถสลับบัญชีเพื่อทดสอบระบบได้:\n\n"
+                "* **admin01** : จัดสรรงานและดูภาพรวมทั้งหมด\n"
+                "* **driver01** : ดูงานของตัวเองและกดรับงาน\n"
+                "* **driver02** : ดูงานของคนขับคนที่ 2")
 
 # หน้าที่ 2: Booker (แบบฟอร์มบันทึกการจองรถ เชื่อมต่อ Aiven DB ตัวเต็ม)
 elif "Booker" in choice:
