@@ -17,17 +17,18 @@ def get_connection():
     )
 
 def send_line_message(message, target_id):
-    token = 'X8ogM3D2GxzZ3z5EBMdOxWTa4BjTlqP1H/bYv+fwqLGNiKhhxuiPQR5bakcgXfEZBUPNDImDlvLrDMvtqN0/8XTlrcqfIvti2m2RpY/wrbQ9xl95HJd+slpzHCM9Vs5SxNS5e9gBG4MSE71UUNhXrQdB04t89/1O/w1cDnyilFU=' # ⚠️ Token LINE ของคุณกล้า
-    url = 'https://api.line.me/v2/bot/message/push'
+    token = 'X8ogM3D2GxzZ3z5EBMdOxWTa4BjTlqP1H/bYv+fwqLGNiKhhxuiPQR5bakcgXfEZBUPNDImDlvLrDMvtqN0/8XTlrcqfIvti2m2RpY/wrbQ9xl95HJd+slpzHCM9Vs5SxNS5e9gBG4MSE71UUNhXrQdB04t89/1O/w1cDnyilFU='
+    url = 'https://api.line.biz/v2/bot/message/push'
     headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {token}'}
     data = {'to': target_id, 'messages': [{'type': 'text', 'text': message}]}
+    
     try:
-            response = requests.post(url, headers=headers, json=data)
-            # ตรวจสอบว่า LINE คืนค่าสถานะผ่านหรือไม่ (ถ้าไม่ผ่าน เช่น 400 หรือ 401 จะส่งแจ้งเตือนขึ้นหน้าเว็บทันที)
-            if response.status_code != 200:
-                st.sidebar.error(f"⚠️ LINE API Error: {response.status_code} - {response.text}")
-     except Exception as e:
-            st.sidebar.error(f"❌ ระบบส่ง LINE ขัดข้อง: {e}")
+        response = requests.post(url, headers=headers, json=data)
+        # ถ้า LINE ส่งกลับมาว่าไม่ใช่ 200 (ยิงไม่เข้า) ให้พ่นเตือนบนเว็บทันที
+        if response.status_code != 200:
+            st.sidebar.error(f"⚠️ LINE API Error: {response.status_code} - {response.text}")
+    except Exception as e:
+        st.sidebar.error(f"❌ ระบบส่ง LINE ขัดข้อง: {e}")
 
 # --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน ---
 def check_permission(user_id):
