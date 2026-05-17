@@ -403,7 +403,7 @@ elif "Airport Staff" in choice:
             return ''
 
         # แสดงตารางแบบจัดเต็มความกว้างหน้าจอ พร้อมใส่สีสันที่คอลัมน์สถานะงาน
-        st.dataframe(df_airport.style.applymap(highlight_status, subset=['สถานะงาน']), use_container_width=True)
+        st.dataframe(df_airport.style.map(highlight_status, subset=['สถานะงาน']), use_container_width=True)
         
         # สรุปยอดจอดรอรับให้เห็นเป็นตัวเลขเข้าใจง่าย
         st.write("---")
