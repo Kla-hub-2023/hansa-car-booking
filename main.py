@@ -22,9 +22,12 @@ def send_line_message(message, target_id):
     headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {token}'}
     data = {'to': target_id, 'messages': [{'type': 'text', 'text': message}]}
     try:
-        requests.post(url, headers=headers, json=data)
-    except Exception as e:
-        pass
+            response = requests.post(url, headers=headers, json=data)
+            # ตรวจสอบว่า LINE คืนค่าสถานะผ่านหรือไม่ (ถ้าไม่ผ่าน เช่น 400 หรือ 401 จะส่งแจ้งเตือนขึ้นหน้าเว็บทันที)
+            if response.status_code != 200:
+                st.sidebar.error(f"⚠️ LINE API Error: {response.status_code} - {response.text}")
+     except Exception as e:
+            st.sidebar.error(f"❌ ระบบส่ง LINE ขัดข้อง: {e}")
 
 # --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน ---
 def check_permission(user_id):
