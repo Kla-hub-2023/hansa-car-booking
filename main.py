@@ -43,33 +43,32 @@ def check_permission(user_id):
 
 st.set_page_config(page_title="ระบบจัดการรถ Multi-Role", layout="wide")
 
-# --- ระบบล็อกอินอัจฉริยะ (เวอร์ชันแก้บั๊กแก้ไขค่าในตู้เซฟความจำ) ---
+# --- ระบบล็อกอินอัจฉริยะ (เวอร์ชันเสถียร ล็อก ID เข้าฐานข้อมูลตรงจุด) ---
 query_params = st.query_params
 
 # 1. เช็กค่าเริ่มต้นในระบบความจำ ถ้าเพิ่งเปิดแอปครั้งแรก ให้จำว่าคือ admin01
 if "default_user_id" not in st.session_state:
     st.session_state["default_user_id"] = "admin01"
 
-# 2. ถ้าตรวจเจอว่ามีการกดมาจากลิงก์ LINE (มี ?user=...) ให้เปลี่ยนค่าตัวแปรกลางทันที
+# 2. ถ้าตรวจเจอว่ามีการกดมาจากลิงก์ LINE (มี ?user=...) ให้จำค่าตัวแปรในลิงก์แทน
 if "user" in query_params:
     url_user = query_params["user"].strip()
-    # หากค่าในลิงก์ไม่ตรงกับค่าปัจจุบัน ค่อยสั่งอัปเดตเพื่อเปลี่ยนหน้า
     if st.session_state["default_user_id"] != url_user:
         st.session_state["default_user_id"] = url_user
 
 st.sidebar.title("🔐 เข้าสู่ระบบ")
 
-# 3. สร้างกล่องข้อความ โดยดึงค่าเริ่มต้นมาจากตัวแปรกลาง (ไม่ทับซ้อนกับ Session State ตัวดั้งเดิม)
+# 3. รับค่าตัวแปรตรงจากกล่องข้อความ โดยมีค่าเริ่มต้นผูกติดกับตู้เซฟความจำ
 current_id = st.sidebar.text_input(
     "ระบุ LINE User ID", 
     value=st.session_state["default_user_id"]
 ).strip()
 
-# 4. อัปเดตค่าความจำล่าสุดตามที่พนักงานพิมพ์หรือคลิกลิงก์จริง
+# 4. ล็อกความจำล่าสุดกลับไปเก็บในระบบ (ช่วยให้ค่านิ่ง ไม่หลุดหายตอนเปลี่ยนหน้า)
 st.session_state["default_user_id"] = current_id
 
-# 5. ตรวจสอบสิทธิ์กับคลาวด์ Aiven MySQL
-user_role = check_permission(current_id).lower()
+# 5. ใช้ค่าไอดีล่าสุดวิ่งตรงไปตรวจสอบสิทธิ์กับคลาวด์ Aiven MySQL 
+user_role = check_permission(current_id).strip().lower()
 st.sidebar.info(f"สิทธิ์ของคุณคือ: {user_role}")
 
 # --- 3. จัดการรายการเมนูฝั่งซ้ายตามระดับสิทธิ์ (เวอร์ชันแยกขาด 1 ต่อ 1 ตามบรีฟคุณกล้า) ---
