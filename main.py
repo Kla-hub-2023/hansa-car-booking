@@ -353,7 +353,65 @@ elif "Driver" in choice:
     else:
         st.info("ℹ️ ปัจจุบันยังไม่มีประวัติหรือใบงานจองรถที่ระบุส่งให้รหัสคนขับคนนี้ในฐานข้อมูล")
 
-# หน้าที่ 5: Airport Staff
+# หน้าที่ 5: Airport Staff (มอนิเตอร์ภาพรวมรถที่กำลังเดินทางมาสนามบิน)
 elif "Airport Staff" in choice:
     st.title("✈️ ตรวจสอบสถานะรถ (Airport Staff)")
-    st.write("หน้าตารางรายงานสำหรับพนักงานภาคพื้นสนามบิน เพื่อมอนิเตอร์ดูว่ารถจองกำลังเดินทางมาถึงในเวลาใดบ้าง")
+    st.subheader("📋 ตารางมอนิเตอร์รถยนต์และคนขับที่กำลังปฏิบัติงาน")
+
+    try:
+        db = get_connection()
+        with db.cursor() as cursor:
+            # คำสั่ง SQL เชื่อม 2 ตาราง (bookings และ users) เพื่อดึงชื่อคนขับออกมาโชว์ให้พนักงานสนามบินเห็นด้วย
+            query_airport = """
+                SELECT 
+                    b.id AS 'ใบงานที่',
+                    b.passenger_name AS 'ชื่อผู้โดยสาร',
+                    b.pickup_location AS 'จุดรับ',
+                    b.dropoff_location AS 'จุดส่ง',
+                    b.booking_time AS 'เวลาเดินทาง',
+                    b.status AS 'สถานะงาน',
+                    u.name AS 'คนขับรถที่รับงาน'
+                FROM bookings b
+                LEFT JOIN users u ON b.driver_id = u.line_user_id
+                WHERE b.status IN ('Assigned', 'Accepted')
+                ORDER BY b.booking_time ASC
+            """
+            cursor.execute(query_airport)
+            airport_data = cursor.fetchall()
+
+        # แปลงข้อมูลเป็น DataFrame เพื่อทำตารางสรุป
+        columns = ['ใบงานที่', 'ชื่อผู้โดยสาร', 'จุดรับ', 'จุดส่ง', 'เวลาเดินทาง', 'สถานะงาน', 'คนขับรถที่รับงาน']
+        df_airport = pd.DataFrame(airport_data, columns=columns)
+
+    except Exception as e:
+        st.error(f"❌ เกิดข้อผิดพลาดในการดึงข้อมูลสำหรับพนักงานสนามบิน: {e}")
+        df_airport = pd.DataFrame()
+    finally:
+        if 'db' in locals() and db.open:
+            db.close()
+
+    # --- แสดงผลตารางมอนิเตอร์ ---
+    if not df_airport.empty:
+        st.write("✨ แสดงเฉพาะงานที่มีการจัดสรรคนขับแล้ว เพื่อเตรียมความพร้อมภาคพื้นสนามบิน")
+        
+        # ไฮไลต์สีให้ตารางอ่านง่าย (Assigned = สีส้ม, Accepted = สีเขียว)
+        def highlight_status(val):
+            if val == 'Accepted':
+                return 'background-color: #d4edda; color: #155724; font-weight: bold;'
+            elif val == 'Assigned':
+                return 'background-color: #fff3cd; color: #856404;'
+            return ''
+
+        # แสดงตารางแบบจัดเต็มความกว้างหน้าจอ พร้อมใส่สีสันที่คอลัมน์สถานะงาน
+        st.dataframe(df_airport.style.applymap(highlight_status, subset=['สถานะงาน']), use_container_width=True)
+        
+        # สรุปยอดจอดรอรับให้เห็นเป็นตัวเลขเข้าใจง่าย
+        st.write("---")
+        col_metrics1, col_metrics2 = st.columns(2)
+        with col_metrics1:
+            st.metric(label="🚖 จำนวนรถที่กำลังเดินทาง (Assigned)", value=len(df_airport[df_airport['สถานะงาน'] == 'Assigned']))
+        with col_metrics2:
+            st.metric(label="✅ จำนวนรถที่คนขับกดรับงานแล้ว (Accepted)", value=len(df_airport[df_airport['สถานะงาน'] == 'Accepted']))
+            
+    else:
+        st.info("ℹ️ ปัจจุบันยังไม่มีรถยนต์คันไหนกำลังเดินทางมาสนามบิน (ไม่มีงานค้างในสถานะ Assigned หรือ Accepted)")
