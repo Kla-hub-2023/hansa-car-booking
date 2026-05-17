@@ -43,20 +43,27 @@ def check_permission(user_id):
 
 st.set_page_config(page_title="ระบบจัดการรถ Multi-Role", layout="wide")
 
-# --- ระบบล็อกอินอัจฉริยะแบบนิรภัย (มาตรฐานสากล Streamlit ป้องกันการทับค่า) ---
-if "logged_in_user" not in st.session_state:
+# --- ระบบล็อกอินอัจฉริยะ (ดักอ่านรหัสออโต้จากลิงก์ LINE Rich Menu) ---
+# 1. ดักจับพารามิเตอร์จาก URL ดูก่อนว่ามีใครจิ้มลิงก์พ่วงท้ายมาไหม (เช่น ?user=booker01)
+query_params = st.query_params
+
+if "user" in query_params:
+    # ถ้าตรวจเจอคำว่า ?user= ในลิงก์ ให้ดึงค่านั้นมาเซ็ตลงห้องความจำระบบทันที
+    url_user = query_params["user"].strip()
+    st.session_state["logged_in_user"] = url_user
+elif "logged_in_user" not in st.session_state:
+    # ถ้าเปิดแอปปกติธรรมดา ไม่มีลิงก์พ่วงท้าย ให้ตั้งค่าเริ่มต้นเป็น admin01 เหมือนเดิม
     st.session_state["logged_in_user"] = "admin01"
 
 st.sidebar.title("🔐 เข้าสู่ระบบ")
 
-# วิธีที่ถูกต้องที่สุด: ผูกกล่องเข้ากับห้องความจำโดยตรงผ่าน key ตัวเดียว (ห้ามใส่ value ซ้ำซ้อน)
-# ท่านี้จะทำให้เวลาคุณกล้าพิมพ์สลับชื่อด้วยมือ ระบบจะอัปเดตความจำทันทีโดยไม่เด้งหลุด
+# 2. ผูกกล่องรับค่าเข้ากับตู้เซฟความจำ (รอบนี้จะเปลี่ยนค่าตามลิงก์ที่จิ้มมาจาก LINE อัตโนมัติ!)
 current_id = st.sidebar.text_input(
     "ระบุ LINE User ID", 
     key="logged_in_user"
 ).strip()
 
-# ดึงไอดีที่อัปเดตล่าสุดสด ๆ ไปตรวจสอบสิทธิ์บนคลาวด์ Aiven
+# 3. ตรวจสอบสิทธิ์กับคลาวด์ Aiven MySQL ตามรหัสที่ลิงก์ส่งมา
 user_role = check_permission(current_id).lower()
 st.sidebar.info(f"สิทธิ์ของคุณคือ: {user_role}")
 
