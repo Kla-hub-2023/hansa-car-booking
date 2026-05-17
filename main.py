@@ -7,7 +7,6 @@ import io
 import datetime as dt_module
 
 # --- 1. การตั้งค่าพื้นฐานและการเชื่อมต่อ DB ---
-@st.cache_resource
 def get_connection():
     return pymysql.connect(
         host='mysql-22653bef-kla-e55d.c.aivencloud.com',
