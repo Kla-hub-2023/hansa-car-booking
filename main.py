@@ -18,7 +18,7 @@ def get_connection():
 
 def send_line_message(message, target_id):
     token = 'X8ogM3D2GxzZ3z5EBMdOxWTa4BjTlqP1H/bYv+fwqLGNiKhhxuiPQR5bakcgXfEZBUPNDImDlvLrDMvtqN0/8XTlrcqfIvti2m2RpY/wrbQ9xl95HJd+slpzHCM9Vs5SxNS5e9gBG4MSE71UUNhXrQdB04t89/1O/w1cDnyilFU='
-    url = 'https://api.line.biz/v2/bot/message/push'
+    url = 'https://api.line.me/v2/bot/message/push'
     headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {token}'}
     data = {'to': target_id, 'messages': [{'type': 'text', 'text': message}]}
     
