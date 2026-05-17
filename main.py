@@ -262,9 +262,89 @@ elif "Dispatcher" in choice:
         st.info("ℹ️ ปัจจุบันยังไม่มีประวัติการจองรถในฐานข้อมูลคลาวด์")
 
 # หน้าที่ 4: Driver
+# หน้าที่ 4: Driver (ดูงานตัวเองบน Cloud + กดรับงานเปลี่ยนสถานะเป็น Accepted)
 elif "Driver" in choice:
     st.title("🚖 งานที่ได้รับมอบหมาย (Driver)")
-    st.write("แสดงรายการงานจองรถทั้งหมดที่เจาะจงมอบหมายให้ไอดี LINE ของคนขับคนนี้")
+    st.subheader(f"👤 รหัสคนขับออนไลน์: {current_id}")
+
+    # --- ส่วนที่ 1: ดึงเฉพาะงานที่ถูกจ่ายให้คนขับคนนี้ ---
+    try:
+        db = get_connection()
+        with db.cursor() as cursor:
+            # คำสั่ง SQL ดึงงานที่ตรงกับ driver_id ของคนที่เข้าใช้งานอยู่
+            query_driver = """
+                SELECT id, passenger_name, pickup_location, dropoff_location, booking_time, status 
+                FROM bookings 
+                WHERE driver_id = %s 
+                ORDER BY booking_time DESC
+            """
+            cursor.execute(query_driver, (current_id,))
+            driver_jobs = cursor.fetchall()
+            
+        # แปลงข้อมูลเป็น DataFrame สวยงามเพื่อไปวาดตารางบนเว็บ
+        columns = ['id', 'passenger_name', 'pickup_location', 'dropoff_location', 'booking_time', 'status']
+        df_driver = pd.DataFrame(driver_jobs, columns=columns)
+        
+    except Exception as e:
+        st.error(f"❌ เกิดข้อผิดพลาดในการเชื่อมต่อข้อมูลคนขับ: {e}")
+        df_driver = pd.DataFrame()
+    finally:
+        if 'db' in locals() and db.open:
+            db.close()
+
+    # --- ส่วนที่ 2: แสดงผลตารางงานและการทำฟังก์ชันกดรับงาน ---
+    if not df_driver.empty:
+        st.write("### 📊 ตารางรายการงานจองของคุณในระบบ")
+        st.dataframe(df_driver, use_container_width=True)
+        
+        st.write("---")
+        
+        # กรองดูว่ามีงานไหนที่จ่ายเข้ามาใหม่แล้วค้างสถานะ 'Assigned' เพื่อให้คนขับกดรับ
+        assigned_jobs = df_driver[df_driver['status'] == 'Assigned']
+        
+        if not assigned_jobs.empty:
+            st.write("### 📥 มีใบงานใหม่รอคุณกดรับทราบ")
+            
+            # ทำลิสต์ให้คนขับเลือกใบงานที่จะรับ (กรณีมีหลายงาน)
+            driver_job_options = {
+                f"🆔 ใบงานที่ {row['id']} | คุณ {row['passenger_name']} ({row['pickup_location']} ➡️ {row['dropoff_location']})": row['id']
+                for _, row in assigned_jobs.iterrows()
+            }
+            
+            col_select_job, col_btn_accept = st.columns([3, 1])
+            
+            with col_select_job:
+                selected_driver_job = st.selectbox("เลือกใบงานที่ต้องการกดรับ", options=list(driver_job_options.keys()))
+                job_id_to_accept = driver_job_options[selected_driver_job]
+                
+            with col_btn_accept:
+                st.write(" ") # เว้นระยะช่องไฟให้ปุ่มเสมอกัน
+                st.write(" ")
+                btn_accept_job = st.button("✅ กดรับทราบและยอมรับงาน")
+                
+            # --- ส่วนที่ 3: กระบวนการหลังกดปุ่มรับงาน ---
+            if btn_accept_job:
+                with st.spinner("กำลังอัปเดตสถานะรับงานลงคลาวด์..."):
+                    try:
+                        db = get_connection()
+                        with db.cursor() as cursor:
+                            # สั่งอัปเดตสถานะในตาราง bookings จาก 'Assigned' ให้กลายเป็น 'Accepted'
+                            sql_accept = "UPDATE bookings SET status = 'Accepted' WHERE id = %s"
+                            cursor.execute(sql_accept, (job_id_to_accept,))
+                            db.commit()
+                            
+                        st.success(f"🎉 คุณได้รับทราบและยอมรับใบงานที่ {job_id_to_accept} เรียบร้อย! ระบบแจ้งส่วนกลางแล้ว")
+                        st.rerun() # รีเฟรชตารางหน้าจอเพื่อเปลี่ยนตัวหนังสือสถานะทันที
+                        
+                    except Exception as e:
+                        st.error(f"❌ ไม่สามารถเปลี่ยนสถานะงานได้: {e}")
+                    finally:
+                        if 'db' in locals() and db.open:
+                            db.close()
+        else:
+            st.success("✨ ยอดเยี่ยม! คุณได้กดรับทราบงานจองค้างหมดเรียบร้อยแล้ว ไม่มีงานใหม่ตกค้างครับ")
+    else:
+        st.info("ℹ️ ปัจจุบันยังไม่มีประวัติหรือใบงานจองรถที่ระบุส่งให้รหัสคนขับคนนี้ในฐานข้อมูล")
 
 # หน้าที่ 5: Airport Staff
 elif "Airport Staff" in choice:
