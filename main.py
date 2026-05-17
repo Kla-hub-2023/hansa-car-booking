@@ -56,33 +56,38 @@ current_id = st.sidebar.text_input(
 user_role = check_permission(current_id).lower()
 st.sidebar.info(f"สิทธิ์ของคุณคือ: {user_role}")
 
-# --- 3. จัดการรายการเมนูฝั่งซ้ายตามระดับสิทธิ์ ---
+# --- 3. จัดการรายการเมนูฝั่งซ้ายตามระดับสิทธิ์ (เวอร์ชันแยกขาด 1 ต่อ 1 ตามบรีฟคุณกล้า) ---
 menu_options = []
-# เช็กสิทธิ์โดยตัดช่องว่าง และแปลงเป็นตัวพิมพ์เล็กทั้งหมดเพื่อความปลอดภัย
 current_role = user_role.strip().lower()
 
+# ตรวจสอบและแจกจ่ายเมนูตามสิทธิ์ที่บันทึกในฐานข้อมูล MySQL
 if current_role == "admin":
-    menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "🚖 Driver", "✈️ Airport Staff"]
-elif current_role == "dispatcher":
-    menu_options = ["➕ Booker", "🖥️ Dispatcher", "🚖 Driver", "✈️ Airport Staff"]
-elif current_role == "driver":
-    menu_options = ["🚖 งานของฉัน (Driver)"]
-elif current_role == "passenger":
+    # Admin เป็นผู้ดูแลระบบสูงสุด ให้เห็นครบทุกเมนูเหมือนเดิม
+    menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "🚖 งานของฉัน (Driver)", "✈️ Airport Staff"]
+elif current_role == "booker":
+    # คนจองรถ เห็นเฉพาะแบบฟอร์มจองรถเท่านั้น
     menu_options = ["➕ Booker"]
-elif current_role == "airportstaff" or current_role == "airport staff":
+elif current_role == "dispatcher":
+    # ฝ่ายจัดสรรรถ เห็นเฉพาะหน้าจ่ายงานเท่านั้น
+    menu_options = ["🖥️ Dispatcher"]
+elif current_role == "driver":
+    # คนขับรถ เห็นเฉพาะหน้างานที่ได้รับมอบหมายของตัวเองเท่านั้น
+    menu_options = ["🚖 งานของฉัน (Driver)"]
+elif current_role in ["airportstaff", "airport staff"]:
+    # พนักงานสนามบิน เห็นเฉพาะหน้ามอนิเตอร์ตรวจสอบสถานะรถเท่านั้น
     menu_options = ["✈️ Airport Staff"]
 else:
-    # หากยังเป็น Guest หรือหาชื่อไม่เจอในฐานข้อมูล
+    # หากเป็น Guest หรือสิทธิ์อื่น ๆ ที่ยังไม่ได้ระบุ
     st.warning("⚠️ คุณไม่มีสิทธิ์เข้าถึงระบบ หรือยังไม่ได้ระบุรหัส LINE User ID ที่ถูกต้องบนฐานข้อมูล")
-    st.info("💡 รหัสที่ระบบตรวจพบตอนนี้คือ: " + f"`{current_id}`" + f" (ระดับสิทธิ์: `{user_role}`)")
+    st.info(f"💡 รหัสที่ระบบตรวจพบตอนนี้คือ: `{current_id}` (ระดับสิทธิ์: `{user_role}`)")
     st.stop()
-    
-# --- ระบบล็อกความจำเมนู (ป้องกันหน้าจอหายจังหวะ Rerun ตัวเลือกข้างใน) ---
-# 1. ตั้งค่าเริ่มต้นให้จำเมนูแรกสุดที่ดึงมาได้
+
+# --- ระบบล็อกความจำเมนู (ป้องกันหน้าจอหาย และตั้งค่าหน้าแรกของแต่ละ Role อัตโนมัติ) ---
 if "current_menu_choice" not in st.session_state or st.session_state["current_menu_choice"] not in menu_options:
+    # ท่านี้จะช่วยให้เวลาแต่ละ Role ล็อกอินเข้ามา จะเจอเมนูแรกของตัวเองทันที ไม่เกิดอาการหน้าขาวเอ๋อ
     st.session_state["current_menu_choice"] = menu_options[0] if menu_options else ""
 
-# 2. ผูกกล่องเมนูวิทยุฝั่งซ้ายเข้ากับตู้เซฟความจำโดยตรงผ่าน key
+# แสดงปุ่มเลือกเมนูวิทยุฝั่งซ้ายตามรายการสิทธิ์ที่ได้รับกรองแล้วด้านบน
 choice = st.sidebar.radio(
     "เมนูใช้งาน", 
     options=menu_options, 
