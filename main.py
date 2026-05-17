@@ -186,7 +186,7 @@ elif "Dispatcher" in choice:
     if not df_bookings.empty:
         st.write("### 📊 ตารางสถานะงานปัจจุบัน")
         # ตกแต่งหน้าตาตารางของ Pandas ก่อนโชว์
-        st.dataframe(df_bookings, use_container_width=True)
+        st.dataframe(df_bookings, width=True)
         
         st.write("---")
         st.write("### 🎯 ฟังก์ชันการจ่ายงานให้คนขับ")
@@ -302,7 +302,7 @@ elif "Driver" in choice:
     # --- ส่วนที่ 2: แสดงผลตารางงานและการทำฟังก์ชันกดรับงาน ---
     if not df_driver.empty:
         st.write("### 📊 ตารางรายการงานจองของคุณในระบบ")
-        st.dataframe(df_driver, use_container_width=True)
+        st.dataframe(df_driver, width=True)
         
         st.write("---")
         
@@ -403,7 +403,7 @@ elif "Airport Staff" in choice:
             return ''
 
         # แสดงตารางแบบจัดเต็มความกว้างหน้าจอ พร้อมใส่สีสันที่คอลัมน์สถานะงาน
-        st.dataframe(df_airport.style.map(highlight_status, subset=['สถานะงาน']), use_container_width=True)
+        st.dataframe(df_airport.style.map(highlight_status, subset=['สถานะงาน']), width=True)
         
         # สรุปยอดจอดรอรับให้เห็นเป็นตัวเลขเข้าใจง่าย
         st.write("---")
