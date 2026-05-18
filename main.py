@@ -272,7 +272,7 @@ elif "Dispatcher" in choice:
             bookings_data = cursor.fetchall()
             
         columns = ['id', 'voucher_no', 'passenger_name', 'pickup_location', 'dropoff_location', 'booking_time', 'status', 'driver_id']
-        df_bookings = pd.DataFrame(bookings_data, columns=columns).drop(columns=['id'])
+        df_bookings = pd.DataFrame(bookings_data, columns=columns)
         
         with db.cursor() as cursor:
             cursor.execute("SELECT line_user_id, name FROM users WHERE role = 'driver'")
