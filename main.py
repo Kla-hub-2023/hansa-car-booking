@@ -147,7 +147,7 @@ choice = st.sidebar.radio(
 # หน้าที่ 1: Dashboard
 if "Dashboard" in choice:
     st.title("🏠 หน้าแรกและภาพรวมระบบ (Dashboard)")
-    st.markdown(f"สวัสดีครับคุณกล้า สถานะการเชื่อมต่อคลาวด์ **Aiven MySQL ปกติดีเยี่ยม** ครับ")
+    st.markdown(f"สวัสดีครับคุณกล้า สถานะการเชื่อมต่อ **ระบบปกติดีเยี่ยม** ครับ")
     st.write("---")
 
     try:
