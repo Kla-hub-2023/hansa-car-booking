@@ -494,7 +494,7 @@ elif "จัดการพนักงาน" in choice:
     try:
         db = get_connection()
         with db.cursor() as cursor:
-            cursor.execute("SELECT line_user_id, name, role FROM users WHERE role = 'guest' ORDER BY id DESC")
+            cursor.execute("SELECT line_user_id, name, role FROM users WHERE role = 'guest'")
             guests_data = cursor.fetchall()
         
         if guests_data:
