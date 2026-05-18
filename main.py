@@ -70,7 +70,8 @@ menu_options = []
 current_role = user_role.strip().lower()
 
 if current_role == "admin":
-    menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "🚖 งานของฉัน (Driver)", "✈️ Airport Staff"]
+    # เพิ่ม "👥 จัดการพนักงาน" เข้าไปต่อท้ายหรือแทรกกลางได้เลยครับ
+    menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "👥 จัดการพนักงาน", "🚖 งานของฉัน (Driver)", "✈️ Airport Staff"]
 elif current_role == "booker":
     menu_options = ["➕ Booker"]
 elif current_role == "dispatcher":
@@ -150,45 +151,6 @@ if "Dashboard" in choice:
                 "* **admin01** : จัดสรรงานและดูภาพรวมทั้งหมด\n"
                 "* **driver01** : ดูงานของตัวเองและกดรับงาน\n"
                 "* **driver02** : ดูงานของคนขับคนที่ 2")
-
-    # 📍 [จุดวางที่ถูกต้อง] หน้าจัดการระบบพนักงานสำหรับสิทธิ์ ADMIN เท่านั้น
-    if current_role == "admin":
-        st.write("---")
-        st.subheader("👥 ระบบจัดการสิทธิ์ผู้ใช้งาน (User Management)")
-        
-        with st.form("user_management_form"):
-            st.write("📝 ลงทะเบียนและกำหนดสิทธิ์พนักงานใหม่")
-            new_line_id = st.text_input("ระบุ LINE User ID (รหัส U ยาว ๆ)").strip()
-            new_name = st.text_input("ระบุชื่อ-นามสกุล พนักงาน").strip()
-            new_role = st.selectbox(
-                "กำหนดตำแหน่ง (Role)", 
-                ["admin", "booker", "dispatcher", "driver", "airportstaff"]
-            )
-            
-            submit_user = st.form_submit_button("💾 บันทึกสิทธิ์เข้าระบบ")
-            
-            if submit_user:
-                if new_line_id and new_name:
-                    try:
-                        conn = get_connection()
-                        cursor = conn.cursor()
-                        
-                        sql = """
-                            INSERT INTO users (line_user_id, name, role) 
-                            VALUES (%s, %s, %s)
-                            ON DUPLICATE KEY UPDATE name = %s, role = %s
-                        """
-                        cursor.execute(sql, (new_line_id, new_name, new_role, new_name, new_role))
-                        conn.commit()
-                        cursor.close()
-                        conn.close()
-                        
-                        st.success(f"🎉 บันทึกสิทธิ์คุณ {new_name} เป็น {new_role} เรียบร้อยแล้ว!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"❌ เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
-                else:
-                    st.warning("⚠️ รบกวนกรอก LINE ID และชื่อพนักงานให้ครบถ้วนครับ")
 
 # หน้าที่ 2: Booker (ฟังก์ชันรันระบบเลข Voucher อัตโนมัติ)
 elif "Booker" in choice:
@@ -495,3 +457,66 @@ elif "Airport Staff" in choice:
             
     else:
         st.info("ℹ️ ปัจจุบันยังไม่มีรถยนต์คันไหนกำลังเดินทางมาสนามบิน (ไม่มีงานค้างในสถานะ Assigned หรือ Accepted)")
+# --- หน้าที่ 6: เมนูพิเศษสำหรับ Admin จัดการพนักงาน ---
+elif "จัดการพนักงาน" in choice:
+    st.title("👥 ระบบจัดการสิทธิ์ผู้ใช้งาน (User Management)")
+    st.write("---")
+    
+    with st.form("user_management_form"):
+        st.write("📝 ลงทะเบียนและกำหนดสิทธิ์พนักงานใหม่")
+        new_line_id = st.text_input("ระบุ LINE User ID (รหัส U ยาว ๆ)").strip()
+        new_name = st.text_input("ระบุชื่อ-นามสกุล พนักงาน").strip()
+        new_role = st.selectbox(
+            "กำหนดตำแหน่ง (Role)", 
+            ["admin", "booker", "dispatcher", "driver", "airportstaff"]
+        )
+        
+        submit_user = st.form_submit_button("💾 บันทึกสิทธิ์เข้าระบบ")
+        
+        if submit_user:
+            if new_line_id and new_name:
+                try:
+                    conn = get_connection()
+                    cursor = conn.cursor()
+                    
+                    sql = """
+                        INSERT INTO users (line_user_id, name, role) 
+                        VALUES (%s, %s, %s)
+                        ON DUPLICATE KEY UPDATE name = %s, role = %s
+                    """
+                    cursor.execute(sql, (new_line_id, new_name, new_role, new_name, new_role))
+                    conn.commit()
+                    cursor.close()
+                    conn.close()
+                    
+                    st.success(f"🎉 บันทึกสิทธิ์คุณ {new_name} เป็น {new_role} เรียบร้อยแล้ว!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
+            else:
+                st.warning("⚠️ รบกวนกรอก LINE ID และชื่อพนักงานให้ครบถ้วนครับ")
+                
+# 💡 [โค้ดเสริมเพิ่มความโปร] ดึงตารางรายชื่อพนักงานทั้งหมดในระบบมาโชว์ให้ Admin ตรวจสอบ
+    st.write("---")
+    st.write("### 📋 รายชื่อพนักงานและระดับสิทธิ์ปัจจุบันในคลาวด์")
+    
+    try:
+        db = get_connection()
+        with db.cursor() as cursor:
+            # ดึงข้อมูลพนักงานทั้งหมดเรียงตามตำแหน่ง
+            cursor.execute("SELECT line_user_id, name, role FROM users ORDER BY role ASC")
+            users_data = cursor.fetchall()
+            
+        columns_users = ['รหัส LINE User ID', 'ชื่อ-นามสกุล พนักงาน', 'ตำแหน่ง (Role)']
+        df_users = pd.DataFrame(users_data, columns=columns_users)
+        
+        if not df_users.empty:
+            st.dataframe(df_users, use_container_width=True)
+        else:
+            st.info("ยังไม่มีข้อมูลผู้ใช้งานในระบบ")
+            
+    except Exception as e:
+        st.error(f"❌ ไม่สามารถดึงตารางรายชื่อพนักงานได้: {e}")
+    finally:
+        if 'db' in locals() and db.open:
+            db.close()                
