@@ -58,35 +58,35 @@ def check_permission(user_id):
 
 st.set_page_config(page_title="ระบบจัดการรถ Multi-Role", layout="wide")
 
-# 🚀 [เวอร์ชันแก้ไขปัญหาตัวหนังสือโดนทับ] สคริปต์สยบบั๊กหน้าจอมือถือและแก้ปัญหา Font ลอยทับขอบจอ
+# 🚀 [เวอร์ชันกระชับ Micro-Font] สคริปต์สยบบั๊กหน้าจอมือถือและแก้ปัญหา Font ใหญ่ล้นจอ
 st.markdown("""
     <style>
-    /* บีบหัวข้อหลักของแต่ละหน้าจอให้พอดีกับความกว้างมือถือ */
+    /* บีบหัวข้อหลักของแต่ละหน้าจอให้เล็กลงพอดีกับความกว้างมือถือแถวเดียว */
     h1 {
-        font-size: 1.8rem !important;
-        padding-top: 0.5rem !important;
-        padding-bottom: 0.5rem !important;
-        line-height: 1.2 !important;
+        font-size: 1.4rem !important; /* ปรับลดลงจาก 1.8rem เป็น 1.4rem เพื่อความเนี๊ยบ */
+        padding-top: 0.3rem !important;
+        padding-bottom: 0.3rem !important;
+        line-height: 1.1 !important;
     }
-    /* บีบหัวข้อรองและตัวหนังสือสวัสดีทักทาย */
+    /* บีบหัวข้อรองและตัวหนังสือสรุปสถิติเล็กลงตามสัดส่วน */
     h2, h3, .stSubheader {
-        font-size: 1.2rem !important;
+        font-size: 1.05rem !important;
         font-weight: 600 !important;
     }
     /* บีบขนาดฟอนต์ในฟอร์มกรอกข้อมูลและปุ่ม dropdown */
     div[data-baseweb="select"], input, label {
-        font-size: 0.95rem !important;
+        font-size: 0.9rem !important;
     }
-    /* 🛠️ [จุดที่แก้ไข] เพิ่มระยะช่องไฟด้านบนสุดของแอปไม่ให้ Font ลอยไปโดนทับ */
+    /* จัดระยะช่องไฟด้านบนสุดของแอปไม่ให้ลอยชนขอบและไม่โดนบดบัง */
     .block-container {
-        padding-top: 3.5rem !important; /* ปรับจาก 1rem เป็น 3.5rem เพื่อดันหัวข้อลงมาให้พ้นขอบ */
+        padding-top: 3.2rem !important;
         padding-bottom: 1rem !important;
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
+        padding-left: 0.8rem !important;
+        padding-right: 0.8rem !important;
     }
-    /* บังคับให้ตาราง Pandas ขยายแบบสมส่วนและตัวหนังสือไม่ล้น */
+    /* บังคับให้ตาราง Pandas และ DataFrame บนมือถือตัวหนังสือเล็กกระชับอ่านง่าย */
     .stDataFrame table {
-        font-size: 0.85rem !important;
+        font-size: 0.8rem !important;
     }
     </style>
     """, unsafe_allow_html=True)
