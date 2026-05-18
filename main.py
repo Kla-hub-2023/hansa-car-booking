@@ -333,55 +333,65 @@ elif "Dispatcher" in choice:
     else:
         st.info("ℹ️ ปัจจุบันยังไม่มีประวัติการจองรถในฐานข้อมูลคลาวด์")
 
-# หน้าที่ 4: Driver
+# หน้าที่ 4: Driver (เวอร์ชันอัปเกรด มีประวัติงานเก่า)
 elif "Driver" in choice:
     st.title("🚖 งานที่ได้รับมอบหมาย (Driver)")
     st.subheader(f"👤 รหัสคนขับออนไลน์: {current_id}")
 
+    # --- ส่วนที่ 1: ดึงข้อมูลแยกเป็น 2 ตาราง (งานปัจจุบัน VS ประวัติงาน) ---
     try:
         db = get_connection()
         with db.cursor() as cursor:
-            query_driver = """
+            # 1.1 ดึงงานปัจจุบันที่ยังทำไม่เสร็จ (Assigned, Accepted)
+            query_current = """
                 SELECT id, voucher_no, passenger_name, pickup_location, dropoff_location, booking_time, status 
                 FROM bookings 
-                WHERE driver_id = %s 
-                ORDER BY booking_time DESC
+                WHERE driver_id = %s AND status IN ('Assigned', 'Accepted')
+                ORDER BY booking_time ASC
             """
-            cursor.execute(query_driver, (current_id,))
-            driver_jobs = cursor.fetchall()
+            cursor.execute(query_current, (current_id,))
+            current_jobs = cursor.fetchall()
+            
+            # 1.2 ดึงประวัติงานที่ทำเสร็จสิ้นแล้ว (Completed)
+            query_history = """
+                SELECT id, voucher_no, passenger_name, pickup_location, dropoff_location, booking_time, status 
+                FROM bookings 
+                WHERE driver_id = %s AND status = 'Completed'
+                ORDER BY booking_time DESC LIMIT 30
+            """
+            cursor.execute(query_history, (current_id,))
+            history_jobs = cursor.fetchall()
             
         columns = ['id', 'voucher_no', 'passenger_name', 'pickup_location', 'dropoff_location', 'booking_time', 'status']
-        df_driver = pd.DataFrame(driver_jobs, columns=columns)
+        df_driver_current = pd.DataFrame(current_jobs, columns=columns)
+        df_driver_history = pd.DataFrame(history_jobs, columns=columns)
         
     except Exception as e:
         st.error(f"❌ เกิดข้อผิดพลาดในการเชื่อมต่อข้อมูลคนขับ: {e}")
-        df_driver = pd.DataFrame()
+        df_driver_current = pd.DataFrame()
+        df_driver_history = pd.DataFrame()
     finally:
         if 'db' in locals() and db.open:
             db.close()
 
-    if not df_driver.empty:
-        st.write("### 📊 ตารางรายการงานจองของคุณในระบบ")
-        st.dataframe(df_driver, use_container_width=True)
+    # --- ส่วนที่ 2: แสดงผลตารางงานปัจจุบันและการกดรับงาน ---
+    st.write("---")
+    st.write("### 📥 รายการงานปัจจุบันที่ต้องปฏิบัติ")
+    if not df_driver_current.empty:
+        st.dataframe(df_driver_current, use_container_width=True)
         
-        st.write("---")
-        
-        assigned_jobs = df_driver[df_driver['status'] == 'Assigned']
-        
+        # 🔔 ปุ่มฟังก์ชันกดรับทราบงานจองค้าง (ดึงมาจากตรรกะเดิมของคุณกล้า)
+        assigned_jobs = df_driver_current[df_driver_current['status'] == 'Assigned']
         if not assigned_jobs.empty:
             st.write("### 📥 มีใบงานใหม่รอคุณกดรับทราบ")
-            
             driver_job_options = {
                 f"🎫 {row['voucher_no']} | คุณ {row['passenger_name']} ({row['pickup_location']} ➡️ {row['dropoff_location']})": row['id']
                 for _, row in assigned_jobs.iterrows()
             }
-            
             col_select_job, col_btn_accept = st.columns([3, 1])
-            
             with col_select_job:
                 selected_driver_job = st.selectbox("เลือกใบงานที่ต้องการกดรับ", options=list(driver_job_options.keys()))
                 job_id_to_accept = driver_job_options[selected_driver_job]
-                
             with col_btn_accept:
                 st.write(" ")
                 st.write(" ")
@@ -395,7 +405,6 @@ elif "Driver" in choice:
                             info_sql = "SELECT voucher_no, dispatcher_id, passenger_name FROM bookings WHERE id = %s"
                             cursor.execute(info_sql, (job_id_to_accept,))
                             job_info = cursor.fetchone()
-                            
                             v_no = job_info[0] if job_info else "ไม่ระบุ"
                             disp_id = job_info[1] if job_info else None
                             p_name = job_info[2] if job_info else "ไม่ระบุ"
@@ -412,19 +421,25 @@ elif "Driver" in choice:
                                     f"🚖 พนักงานขับรถ: {current_id} ได้กดรับทราบและกำลังเตรียมออกปฏิบัติงานครับ"
                                 )
                                 send_line_message(msg_back_to_admin, disp_id)
-                            
-                        st.success(f"🎉 คุณได้รับทราบและยอมรับใบงานเรียบร้อย! ระบบส่งสัญญาณแจ้งเตือนเข้า LINE แอดมินผู้จ่ายงานแล้ว")
+                        st.success(f"🎉 คุณได้รับทราบและยอมรับใบงานเรียบร้อย!")
                         st.rerun()
-                        
                     except Exception as e:
                         st.error(f"❌ ไม่สามารถเปลี่ยนสถานะงานได้: {e}")
                     finally:
                         if 'db' in locals() and db.open:
                             db.close()
-        else:
-            st.success("✨ ยอดเยี่ยม! คุณได้กดรับทราบงานจองค้างหมดเรียบร้อยแล้ว ไม่มีงานใหม่ตกค้างครับ")
     else:
-        st.info("ℹ️ ปัจจุบันยังไม่มีประวัติหรือใบงานจองรถที่ระบุส่งให้รหัสคนขับคนนี้ในฐานข้อมูล")
+        st.success("✨ ไม่มีงานปัจจุบันค้างอยู่ (คุณวิ่งงานครบถ้วนหมดแล้วครับ)")
+
+    # --- ส่วนที่ 3: [ฟีเจอร์เพิ่มพรีเมียม] ตารางแสดงประวัติงานที่ทำเสร็จแล้ว ---
+    st.write("---")
+    st.write("### ✅ ประวัติการวิ่งงานที่เสร็จสิ้นแล้ว (Completed)")
+    if not df_driver_history.empty:
+        # สรุปยอดวิ่งงานให้คนขับใจชื้น
+        st.info(f"💡 รวมผลงานของคุณ: เดือนนี้คุณวิ่งงานเสร็จสิ้นไปแล้วทั้งหมด **{len(df_driver_history)}** ใบงาน ยอดเยี่ยมมากครับ!")
+        st.dataframe(df_driver_history, use_container_width=True)
+    else:
+        st.info("ℹ️ ยังไม่มีประวัติงานที่บันทึกสถานะเสร็จสิ้น (Completed) ในระบบ")
 
 # หน้าที่ 5: Airport Staff
 elif "Airport Staff" in choice:
