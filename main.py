@@ -89,7 +89,7 @@ st.markdown("""
         font-size: 0.85rem !important;
     }
     </style>
-    """, unsafe_style_html=True)
+    """, unsafe_allow_html=True)
 
 # --- ระบบล็อกอินอัจฉริยะ (เวอร์ชันเสถียร ล็อก ID เข้าฐานข้อมูลตรงจุด) ---
 query_params = st.query_params
