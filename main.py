@@ -518,7 +518,6 @@ elif "Airport Staff" in choice:
         with db.cursor() as cursor:
             query_airport = """
                 SELECT 
-                    b.id AS 'ใบงานที่',
                     b.voucher_no AS 'เลข Voucher',
                     b.passenger_name AS 'ชื่อผู้โดยสาร',
                     b.pickup_location AS 'จุดรับ',
@@ -534,7 +533,7 @@ elif "Airport Staff" in choice:
             cursor.execute(query_airport)
             airport_data = cursor.fetchall()
 
-        columns = ['ใบงานที่', 'เลข Voucher', 'ชื่อผู้โดยสาร', 'จุดรับ', 'จุดส่ง', 'เวลาเดินทาง', 'สถานะงาน', 'คนขับรถที่รับงาน']
+        columns = ['เลข Voucher', 'ชื่อผู้โดยสาร', 'จุดรับ', 'จุดส่ง', 'เวลาเดินทาง', 'สถานะงาน', 'คนขับรถที่รับงาน']
         df_airport = pd.DataFrame(airport_data, columns=columns)
 
     except Exception as e:
