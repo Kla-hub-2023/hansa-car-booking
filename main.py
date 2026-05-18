@@ -288,10 +288,10 @@ elif "Dispatcher" in choice:
         if 'db' in locals() and db.open:
             db.close()
 
+    # ✅ โค้ดใหม่ที่แก้ไขถูกต้องสมบูรณ์ 100%
     if not df_bookings.empty:
         st.write("### 📊 ตารางสถานะงานปัจจุบัน")
-        # 🌟 จุดปรับปรุงที่ 2: ซ่อนดัชนีตัวเลขในหน้าจัดการงานแอดมิน
-        st.dataframe(df_bookings, use_container_width=True, hide_index=True)
+        st.dataframe(df_bookings, use_container_width=True, hide_index=True) # 👈 เหลือเฉพาะตัวที่ซ่อน Index ไว้
         st.write("---")
         
         col_left_side, col_right_side = st.columns([1, 1])
