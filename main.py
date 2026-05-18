@@ -333,12 +333,29 @@ elif "Dispatcher" in choice:
     else:
         st.info("ℹ️ ปัจจุบันยังไม่มีประวัติการจองรถในฐานข้อมูลคลาวด์")
 
-# หน้าที่ 4: Driver (เวอร์ชันอัปเกรด มีประวัติงานเก่า)
+# หน้าที่ 4: Driver (เวอร์ชันอัปเกรด แสดงชื่อพนักงานขับรถแทนรหัสตัว U)
 elif "Driver" in choice:
     st.title("🚖 งานที่ได้รับมอบหมาย (Driver)")
-    st.subheader(f"👤 รหัสคนขับออนไลน์: {current_id}")
+    
+    # 🚀 [เพิ่มใหม่] วิ่งไปสอยชื่อของคนขับรถจากตาราง users ตามรหัสไลน์ปัจจุบัน
+    driver_name = "ไม่ระบุชื่อ"
+    try:
+        db = get_connection()
+        with db.cursor() as cursor:
+            cursor.execute("SELECT name FROM users WHERE line_user_id = %s", (current_id,))
+            user_res = cursor.fetchone()
+            if user_res:
+                driver_name = user_res[0]
+    except Exception as e:
+        pass
+    finally:
+        if 'db' in locals() and db.open:
+            db.close()
 
-    # --- ส่วนที่ 1: ดึงข้อมูลแยกเป็น 2 ตาราง (งานปัจจุบัน VS ประวัติงาน) ---
+    # ✨ แสดงทักทายด้วยชื่อพนักงานขับรถตัวจริงแทนรหัสตัว U ยาว ๆ แล้วครับ
+    st.subheader(f"👋 สวัสดีครับ: {driver_name}")
+
+    # --- ส่วนที่ 1: ดึงข้อมูลแยกเป็น 2 ตาราง (งานปัจจุบัน VS ประวัติงานเหมือนเดิม) ---
     try:
         db = get_connection()
         with db.cursor() as cursor:
@@ -380,7 +397,6 @@ elif "Driver" in choice:
     if not df_driver_current.empty:
         st.dataframe(df_driver_current, use_container_width=True)
         
-        # 🔔 ปุ่มฟังก์ชันกดรับทราบงานจองค้าง (ดึงมาจากตรรกะเดิมของคุณกล้า)
         assigned_jobs = df_driver_current[df_driver_current['status'] == 'Assigned']
         if not assigned_jobs.empty:
             st.write("### 📥 มีใบงานใหม่รอคุณกดรับทราบ")
@@ -418,7 +434,7 @@ elif "Driver" in choice:
                                     f"✅ คนขับกดรับงานแล้วครับ!\n"
                                     f"🎫 เลข Voucher: {v_no}\n"
                                     f"👤 ลูกค้า: {p_name}\n"
-                                    f"🚖 พนักงานขับรถ: {current_id} ได้กดรับทราบและกำลังเตรียมออกปฏิบัติงานครับ"
+                                    f"🚖 พนักงานขับรถ: {driver_name} ได้กดรับทราบและกำลังเตรียมออกปฏิบัติงานครับ"
                                 )
                                 send_line_message(msg_back_to_admin, disp_id)
                         st.success(f"🎉 คุณได้รับทราบและยอมรับใบงานเรียบร้อย!")
@@ -431,11 +447,10 @@ elif "Driver" in choice:
     else:
         st.success("✨ ไม่มีงานปัจจุบันค้างอยู่ (คุณวิ่งงานครบถ้วนหมดแล้วครับ)")
 
-    # --- ส่วนที่ 3: [ฟีเจอร์เพิ่มพรีเมียม] ตารางแสดงประวัติงานที่ทำเสร็จแล้ว ---
+    # --- ส่วนที่ 3: ตารางแสดงประวัติงานที่ทำเสร็จแล้ว ---
     st.write("---")
     st.write("### ✅ ประวัติการวิ่งงานที่เสร็จสิ้นแล้ว (Completed)")
     if not df_driver_history.empty:
-        # สรุปยอดวิ่งงานให้คนขับใจชื้น
         st.info(f"💡 รวมผลงานของคุณ: เดือนนี้คุณวิ่งงานเสร็จสิ้นไปแล้วทั้งหมด **{len(df_driver_history)}** ใบงาน ยอดเยี่ยมมากครับ!")
         st.dataframe(df_driver_history, use_container_width=True)
     else:
