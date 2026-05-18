@@ -270,7 +270,7 @@ elif "Dispatcher" in choice:
             cursor.execute(query_bookings)
             bookings_data = cursor.fetchall()
             
-        columns = ['voucher_no', 'passenger_name', 'pickup_location', 'dropoff_location', 'booking_time', 'status', 'driver_id']
+        columns = ['id', 'voucher_no', 'passenger_name', 'pickup_location', 'dropoff_location', 'booking_time', 'status', 'driver_id']
         df_bookings = pd.DataFrame(bookings_data, columns=columns)
         
         with db.cursor() as cursor:
