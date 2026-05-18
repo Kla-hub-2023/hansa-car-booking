@@ -288,10 +288,15 @@ elif "Dispatcher" in choice:
         if 'db' in locals() and db.open:
             db.close()
 
-    # ✅ โค้ดใหม่ที่แก้ไขถูกต้องสมบูรณ์ 100%
+    # ✅ สั่งโชว์ตารางแบบล้ำ ๆ: ซ่อน Index ของเว็บ และ ซ่อนคอลัมน์ id ไม่ให้คนเห็น แต่หลังบ้านยังทำงานได้!
     if not df_bookings.empty:
         st.write("### 📊 ตารางสถานะงานปัจจุบัน")
-        st.dataframe(df_bookings, use_container_width=True, hide_index=True) # 👈 เหลือเฉพาะตัวที่ซ่อน Index ไว้
+        st.dataframe(
+            df_bookings, 
+            use_container_width=True, 
+            hide_index=True,
+            column_config={"id": None}  # 🚀 ไฮไลต์เด็ด: สั่งให้ Streamlit ซ่อนคอลัมน์ id ไม่ต้องโชว์บนจอ!
+        )
         st.write("---")
         
         col_left_side, col_right_side = st.columns([1, 1])
