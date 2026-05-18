@@ -63,7 +63,7 @@ st.markdown("""
     <style>
     /* บีบหัวข้อหลักของแต่ละหน้าจอให้เล็กลงพอดีกับความกว้างมือถือแถวเดียว */
     h1 {
-        font-size: 1.4rem !important; /* ปรับลดลงจาก 1.8rem เป็น 1.4rem เพื่อความเนี๊ยบ */
+        font-size: 1.4rem !important;
         padding-top: 0.3rem !important;
         padding-bottom: 0.3rem !important;
         line-height: 1.1 !important;
@@ -188,7 +188,8 @@ if "Dashboard" in choice:
     with col_left:
         st.write("### ⏱️ รายการจองรถล่าสุด 5 รายการ")
         if not df_recent.empty:
-            st.dataframe(df_recent, use_container_width=True)
+            # 🌟 จุดปรับปรุงที่ 1: ซ่อนดัชนีตัวเลขหน้าแดชบอร์ด
+            st.dataframe(df_recent, use_container_width=True, hide_index=True)
         else:
             st.info("ยังไม่มีประวัติการจองในระบบ")
             
@@ -289,10 +290,10 @@ elif "Dispatcher" in choice:
 
     if not df_bookings.empty:
         st.write("### 📊 ตารางสถานะงานปัจจุบัน")
-        st.dataframe(df_bookings, use_container_width=True)
+        # 🌟 จุดปรับปรุงที่ 2: ซ่อนดัชนีตัวเลขในหน้าจัดการงานแอดมิน
+        st.dataframe(df_bookings, use_container_width=True, hide_index=True)
         st.write("---")
         
-        # ปรับ layout เป็นคอลัมน์แนวตั้งเมื่อเจอบนมือถือ
         col_left_side, col_right_side = st.columns([1, 1])
         
         with col_left_side:
@@ -449,7 +450,8 @@ elif "Driver" in choice:
     st.write("---")
     st.write("### 📥 รายการงานปัจจุบันที่ต้องปฏิบัติ")
     if not df_driver_current.empty:
-        st.dataframe(df_driver_current, use_container_width=True)
+        # 🌟 จุดปรับปรุงที่ 3: ซ่อนดัชนีตัวเลขในตารางงานปัจจุบันของคนขับ
+        st.dataframe(df_driver_current, use_container_width=True, hide_index=True)
         
         assigned_jobs = df_driver_current[df_driver_current['status'] == 'Assigned']
         if not assigned_jobs.empty:
@@ -504,7 +506,8 @@ elif "Driver" in choice:
     st.write("### ✅ ประวัติการวิ่งงานที่เสร็จสิ้นแล้ว (Completed)")
     if not df_driver_history.empty:
         st.info(f"💡 เดือนนี้คุณวิ่งงานเสร็จสิ้นไปแล้วทั้งหมด **{len(df_driver_history)}** ใบงาน")
-        st.dataframe(df_driver_history, use_container_width=True)
+        # 🌟 จุดปรับปรุงที่ 4: ซ่อนดัชนีตัวเลขในตารางประวัติงานเก่าของคนขับ
+        st.dataframe(df_driver_history, use_container_width=True, hide_index=True)
     else:
         st.info("ℹ️ ยังไม่มีประวัติงานที่บันทึกสถานะเสร็จสิ้น")
 
@@ -553,7 +556,8 @@ elif "Airport Staff" in choice:
                 return 'background-color: #fff3cd; color: #856404;'
             return ''
 
-        st.dataframe(df_airport.style.map(highlight_status, subset=['สถานะงาน']), use_container_width=True)
+        # 🌟 จุดปรับปรุงที่ 5: ซ่อนดัชนีตัวเลขในตารางมอนิเตอร์พนักงานภาคพื้นสนามบิน
+        st.dataframe(df_airport.style.map(highlight_status, subset=['สถานะงาน']), use_container_width=True, hide_index=True)
         
         st.write("---")
         col_metrics1, col_metrics2 = st.columns(2)
@@ -579,7 +583,8 @@ elif "จัดการพนักงาน" in choice:
         
         if guests_data:
             df_guests = pd.DataFrame(guests_data, columns=['รหัส LINE User ID', 'ชื่อชั่วคราว', 'สถานะ'])
-            st.dataframe(df_guests, use_container_width=True)
+            # 🌟 จุดปรับปรุงที่ 6: ซ่อนดัชนีตัวเลขในตารางพนักงานใหม่ (Guest) ที่รออนุมัติ
+            st.dataframe(df_guests, use_container_width=True, hide_index=True)
             st.info("💡 คุณกล้าสามารถก๊อปปี้รหัส LINE ID จากตารางด้านบนมาวางเพื่ออัปเดตสิทธิ์ได้ครับ")
         else:
             st.success("✨ เรียบร้อยดี! ไม่มีพนักงานใหม่ค้างรออนุมัติสิทธิ์ในระบบครับ")
@@ -638,7 +643,8 @@ elif "จัดการพนักงาน" in choice:
         df_users = pd.DataFrame(users_data, columns=columns_users)
         
         if not df_users.empty:
-            st.dataframe(df_users, use_container_width=True)
+            # 🌟 จุดปรับปรุงที่ 7: ซ่อนดัชนีตัวเลขในตารางรายชื่อพนักงานทั้งหมดในระบบของแอดมิน
+            st.dataframe(df_users, use_container_width=True, hide_index=True)
         else:
             st.info("ยังไม่มีข้อมูลผู้ใช้งานในระบบ")
             
