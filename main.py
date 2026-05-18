@@ -58,7 +58,7 @@ def check_permission(user_id):
 
 st.set_page_config(page_title="ระบบจัดการรถ Multi-Role", layout="wide")
 
-# 🚀 [เพิ่มใหม่] สคริปต์สยบบั๊กหน้าจอมือถือ บีบตัวอักษรและตารางให้กะทัดรัด (Mobile CSS Injection)
+# 🚀 [เวอร์ชันแก้ไขปัญหาตัวหนังสือโดนทับ] สคริปต์สยบบั๊กหน้าจอมือถือและแก้ปัญหา Font ลอยทับขอบจอ
 st.markdown("""
     <style>
     /* บีบหัวข้อหลักของแต่ละหน้าจอให้พอดีกับความกว้างมือถือ */
@@ -77,9 +77,9 @@ st.markdown("""
     div[data-baseweb="select"], input, label {
         font-size: 0.95rem !important;
     }
-    /* ลดช่องไฟความว่างเปล่าด้านบนสุดของแอป (Padding Block) */
+    /* 🛠️ [จุดที่แก้ไข] เพิ่มระยะช่องไฟด้านบนสุดของแอปไม่ให้ Font ลอยไปโดนทับ */
     .block-container {
-        padding-top: 1rem !important;
+        padding-top: 3.5rem !important; /* ปรับจาก 1rem เป็น 3.5rem เพื่อดันหัวข้อลงมาให้พ้นขอบ */
         padding-bottom: 1rem !important;
         padding-left: 1rem !important;
         padding-right: 1rem !important;
