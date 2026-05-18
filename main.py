@@ -118,7 +118,7 @@ choice = st.sidebar.radio(
 # หน้าที่ 1: Dashboard
 if "Dashboard" in choice:
     st.title("🏠 หน้าแรกและภาพรวมระบบ (Dashboard)")
-    st.markdown(f"สวัสดีครับคุณกล้า สถานะการเชื่อมต่อคลาวด์ **Aiven MySQL ปกติดีเยี่ยม** ครับ")
+    st.markdown(f"สวัสดีครับคุณกล้า สถานะการเชื่อมต่อ **Aiven MySQL ปกติดีเยี่ยม** ครับ")
     st.write("---")
 
     try:
@@ -199,7 +199,7 @@ elif "Booker" in choice:
         elif pickup_location == dropoff_location:
             st.error("⚠️ จุดรับและจุดส่งห้ามเป็นสถานที่เดียวกันครับ")
         else:
-            with st.spinner("กำลังคำนวณรหัสและบันทึกข้อมูลลงระบบคลาวด์..."):
+            with st.spinner("กำลังคำนวณรหัสและบันทึกข้อมูลลงระบบ..."):
                 try:
                     db = get_connection()
                     now = dt_module.datetime.now()
@@ -229,11 +229,12 @@ elif "Booker" in choice:
                     if 'db' in locals() and db.open:
                         db.close()
 
-# หน้าที่ 3: Dispatcher
+# หน้าที่ 3: Dispatcher (เวอร์ชันเพิ่มปุ่มกดปิดงาน Completed หลังส่งผู้โดยสาร)
 elif "Dispatcher" in choice:
     st.title("🖥️ หน้าจัดการงาน (Dispatcher)")
-    st.subheader("📋 รายการจองรถทั้งหมดที่รอจัดสรรคนขับ")
+    st.subheader("📋 รายการจองรถทั้งหมดในระบบ")
 
+    # --- ส่วนที่ 1: ดึงงานจากระบบมาแสดงผลตารางภาพรวม ---
     try:
         db = get_connection()
         with db.cursor() as cursor:
@@ -258,54 +259,45 @@ elif "Dispatcher" in choice:
         if 'db' in locals() and db.open:
             db.close()
 
+    # แสดงตารางงานภาพรวมทั้งหมดให้ Dispatcher เห็นบนหน้าจอ
     if not df_bookings.empty:
         st.write("### 📊 ตารางสถานะงานปัจจุบัน")
         st.dataframe(df_bookings, use_container_width=True)
-        
         st.write("---")
-        st.write("### 🎯 ฟังก์ชันการจ่ายงานให้คนขับ")
         
-        pending_jobs = df_bookings[df_bookings['status'] == 'Pending']
+        # 🏢 สร้าง Layout แบ่งฝั่งการควบคุม (ซ้าย: จ่ายงานใหม่ | ขวา: ปิดงานเก่าที่เสร็จแล้ว)
+        col_left_side, col_right_side = st.columns(2)
         
-        if not pending_jobs.empty:
-            job_options = {
-                f"🆔 {row['voucher_no']} | คุณ {row['passenger_name']} ({row['pickup_location']} ➡️ {row['dropoff_location']})": row['id']
-                for _, row in pending_jobs.iterrows()
-            }
+        # ------------------ 🎯 [ฝั่งซ้าย] ฟังก์ชันการจ่ายงานให้คนขับ (Pending -> Assigned) ------------------
+        with col_left_side:
+            st.write("### 🎯 ฟังก์ชันการจ่ายงานให้คนขับ")
+            pending_jobs = df_bookings[df_bookings['status'] == 'Pending']
             
-            col_job, col_drv, col_btn = st.columns([2, 1, 1])
-            
-            with col_job:
-                selected_job_text = st.selectbox("1️⃣ เลือกใบงานที่ต้องการจัดสรร", options=list(job_options.keys()))
+            if not pending_jobs.empty:
+                job_options = {
+                    f"🆔 {row['voucher_no']} | คุณ {row['passenger_name']}": row['id']
+                    for _, row in pending_jobs.iterrows()
+                }
+                
+                selected_job_text = st.selectbox("1️⃣ เลือกใบงานที่ต้องการจัดสรร", options=list(job_options.keys()), key="sb_assign")
                 job_id_to_update = job_options[selected_job_text]
                 selected_job_data = pending_jobs[pending_jobs['id'] == job_id_to_update].iloc[0]
-            
-            with col_drv:
+                
                 if driver_options:
-                    selected_driver_text = st.selectbox("2️⃣ เลือกคนขับรถที่จะส่งงาน", options=list(driver_options.keys()))
+                    selected_driver_text = st.selectbox("2️⃣ เลือกคนขับรถที่จะส่งงาน", options=list(driver_options.keys()), key="sb_drv_assign")
                     driver_id_to_assign = driver_options[selected_driver_text]
                 else:
                     st.warning("⚠️ ไม่มีรายชื่อคนขับในระบบ")
                     driver_id_to_assign = None
                     
-            with col_btn:
-                st.write(" ")
-                st.write(" ")
                 btn_assign = st.button("🚀 กดจ่ายงานและส่ง LINE")
                 
-            if btn_assign:
-                if not driver_id_to_assign:
-                    st.error("❌ ไม่สามารถจ่ายงานได้ เนื่องจากไม่ได้เลือกคนขับรถครับ")
-                else:
-                    with st.spinner("กำลังอัปเดตสถานะงานและส่งข้อความเข้า LINE..."):
+                if btn_assign and driver_id_to_assign:
+                    with st.spinner("กำลังจ่ายงานและส่งข้อความเข้า LINE..."):
                         try:
                             db = get_connection()
                             with db.cursor() as cursor:
-                                sql_update = """
-                                    UPDATE bookings 
-                                    SET status = 'Assigned', driver_id = %s, dispatcher_id = %s 
-                                    WHERE id = %s
-                                """
+                                sql_update = "UPDATE bookings SET status = 'Assigned', driver_id = %s, dispatcher_id = %s WHERE id = %s"
                                 cursor.execute(sql_update, (driver_id_to_assign, current_id, job_id_to_update))
                                 db.commit()
                                 
@@ -319,19 +311,66 @@ elif "Dispatcher" in choice:
                                 f"รบกวนตรวจสอบและเข้าหน้าเว็บเพื่อกดรับงานด้วยครับ"
                             )
                             send_line_message(msg_to_line, driver_id_to_assign)
-                            
-                            st.success(f"🎉 จ่ายงานใบงาน {selected_job_data['voucher_no']} เรียบร้อย! ส่งแจ้งเตือน LINE เรียบร้อย")
+                            st.success(f"🎉 จ่ายงาน {selected_job_data['voucher_no']} สำเร็จ!")
                             st.rerun()
-                            
                         except Exception as e:
-                            st.error(f"❌ เกิดข้อผิดพลาดระหว่างจ่ายงาน: {e}")
+                            st.error(f"เกิดข้อผิดพลาด: {e}")
                         finally:
                             if 'db' in locals() and db.open:
                                 db.close()
-        else:
-            st.success("✨ ยอดเยี่ยมมาก! ตอนนี้ไม่มีงานจองค้างสถานะ Pending (จ่ายงานครบหมดทุกใบแล้วครับ)")
+            else:
+                st.success("✨ ยอดเยี่ยมมาก! จ่ายงานค้างครบหมดทุกใบแล้วครับ")
+                
+        # ------------------ 🏁 [ฝั่งขวา] ฟังก์ชันการกดปิดงาน (Accepted -> Completed) ------------------
+        with col_right_side:
+            st.write("### 🏁 ฟังก์ชันการปิดงาน (Completed)")
+            # กรองเฉพาะงานที่คนขับกดรับไปแล้วและกำลังปฏิบัติงานอยู่ (Accepted)
+            active_jobs = df_bookings[df_bookings['status'] == 'Accepted']
+            
+            if not active_jobs.empty:
+                # สร้างดิกชันนารีเพื่อทำ Dropdown ให้แอดมินเลือกใบงานที่จะปิดเคส
+                complete_job_options = {
+                    f"✅ {row['voucher_no']} | คุณ {row['passenger_name']} (คนขับ: {row['driver_id'][:6]}...)" : row['id']
+                    for _, row in active_jobs.iterrows()
+                }
+                
+                selected_complete_text = st.selectbox("🎯 เลือกใบงานที่ส่งผู้โดยสารเรียบร้อยแล้ว", options=list(complete_job_options.keys()), key="sb_complete")
+                job_id_to_complete = complete_job_options[selected_complete_text]
+                selected_complete_data = active_jobs[active_jobs['id'] == job_id_to_complete].iloc[0]
+                
+                btn_complete = st.button("🏁 ยืนยันปิดงานเสร็จสิ้น (Completed)")
+                
+                if btn_complete:
+                    with st.spinner("กำลังบันทึกสถานะจบงานและส่งสัญญาณสรุปยอด..."):
+                        try:
+                            db = get_connection()
+                            with db.cursor() as cursor:
+                                # ปรับสถานะในระบบเป็น 'Completed'
+                                sql_complete = "UPDATE bookings SET status = 'Completed' WHERE id = %s"
+                                cursor.execute(sql_complete, (job_id_to_complete,))
+                                db.commit()
+                                
+                            # ยิงข้อความเข้า LINE บอกคนขับรถด้วยเพื่อให้เขาเช็กประวัติวิ่งงานตัวเองได้ทันที
+                            if selected_complete_data['driver_id']:
+                                msg_to_driver_complete = (
+                                    f"🏁 แอดมินปิดงานให้เรียบร้อยครับ!\n"
+                                    f"🎫 เลข Voucher: {selected_complete_data['voucher_no']}\n"
+                                    f"👤 ลูกค้า: {selected_complete_data['passenger_name']}\n"
+                                    f"ระบบบันทึกผลงานลงประวัติเรียบร้อย ขอบคุณมากครับสำหรับการเดินทาง"
+                                )
+                                send_line_message(msg_to_driver_complete, selected_complete_data['driver_id'])
+                                
+                            st.success(f"🎉 ปิดใบงาน {selected_complete_data['voucher_no']} เสร็จสมบูรณ์ ข้อมูลย้ายเข้าประวัติเรียบร้อย!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"เกิดข้อผิดพลาดในการปิดงาน: {e}")
+                        finally:
+                            if 'db' in locals() and db.open:
+                                db.close()
+            else:
+                st.info("ℹ️ ปัจจุบันไม่มีรถที่กำลังวิ่งงานในระบบ (ไม่มีงานสถานะ Accepted ค้างอยู่)")
     else:
-        st.info("ℹ️ ปัจจุบันยังไม่มีประวัติการจองรถในฐานข้อมูลคลาวด์")
+        st.info("ℹ️ ปัจจุบันยังไม่มีประวัติการจองรถในฐานข้อมูลระบบ")
 
 # หน้าที่ 4: Driver (เวอร์ชันอัปเกรด แสดงชื่อพนักงานขับรถแทนรหัสตัว U)
 elif "Driver" in choice:
@@ -578,7 +617,7 @@ elif "จัดการพนักงาน" in choice:
                 
     # 💡 [จัดระเบียบย่อหน้าใหม่สำเร็จ] ดึงตารางรายชื่อพนักงานทั้งหมดในระบบมาโชว์ให้ Admin ตรวจสอบ (แสดงผลเฉพาะหน้า Admin เท่านั้น)
     st.write("---")
-    st.write("### 📋 รายชื่อพนักงานและระดับสิทธิ์ปัจจุบันในคลาวด์")
+    st.write("### 📋 รายชื่อพนักงานและระดับสิทธิ์ปัจจุบันในระบบ")
     
     try:
         db = get_connection()
