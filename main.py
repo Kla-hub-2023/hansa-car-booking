@@ -464,7 +464,7 @@ elif "จัดการพนักงาน" in choice:
     
     with st.form("user_management_form"):
         st.write("📝 ลงทะเบียนและกำหนดสิทธิ์พนักงานใหม่")
-        new_line_id = st.text_input("ระบุ LINE User ID (รหัส U ยาว ๆ)").strip()
+        new_line_id = st.text_input("ระบุ LINE User ID").strip()
         new_name = st.text_input("ระบุชื่อ-นามสกุล พนักงาน").strip()
         new_role = st.selectbox(
             "กำหนดตำแหน่ง (Role)", 
