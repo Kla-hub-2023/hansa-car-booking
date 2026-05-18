@@ -377,16 +377,37 @@ elif "Driver" in choice:
                 st.write(" ")
                 btn_accept_job = st.button("✅ กดรับทราบและยอมรับงาน")
                 
+            # --- ส่วนที่ 3: กระบวนการหลังกดปุ่มรับงาน (เวอร์ชันยิง LINE กลับหาแอดมิน) ---
             if btn_accept_job:
-                with st.spinner("กำลังอัปเดตสถานะรับงานลงคลาวด์..."):
+                with st.spinner("กำลังอัปเดตสถานะรับงานและแจ้งเตือนแอดมิน..."):
                     try:
                         db = get_connection()
                         with db.cursor() as cursor:
+                            # 1. ก่อนจะอัปเดต ขอแอบดึงเลข Voucher และรหัส dispatcher_id ผู้จ่ายงานออกมาก่อน
+                            info_sql = "SELECT voucher_no, dispatcher_id, passenger_name FROM bookings WHERE id = %s"
+                            cursor.execute(info_sql, (job_id_to_accept,))
+                            job_info = cursor.fetchone()
+                            
+                            v_no = job_info[0] if job_info else "ไม่ระบุ"
+                            disp_id = job_info[1] if job_info else None
+                            p_name = job_info[2] if job_info else "ไม่ระบุ"
+
+                            # 2. สั่งอัปเดตสถานะในตาราง bookings จาก 'Assigned' ให้กลายเป็น 'Accepted'
                             sql_accept = "UPDATE bookings SET status = 'Accepted' WHERE id = %s"
                             cursor.execute(sql_accept, (job_id_to_accept,))
                             db.commit()
                             
-                        st.success(f"🎉 คุณได้รับทราบและยอมรับใบงานเรียบร้อย! ระบบแจ้งส่วนกลางแล้ว")
+                            # 3. ถ้างานนี้มีรหัสแอดมินผู้จ่ายงานผูกอยู่ ให้ส่ง LINE เด้งกลับไปบอกเขาทันที!
+                            if disp_id:
+                                msg_back_to_admin = (
+                                    f"✅ คนขับกดรับงานแล้วครับ!\n"
+                                    f"🎫 เลข Voucher: {v_no}\n"
+                                    f"👤 ลูกค้า: {p_name}\n"
+                                    f"🚖 พนักงานขับรถ: {current_id} ได้กดรับทราบและกำลังเตรียมออกปฏิบัติงานครับ"
+                                )
+                                send_line_message(msg_back_to_admin, disp_id)
+                            
+                        st.success(f"🎉 คุณได้รับทราบและยอมรับใบงานเรียบร้อย! ระบบส่งสัญญาณแจ้งเตือนเข้า LINE แอดมินผู้จ่ายงานแล้ว")
                         st.rerun()
                         
                     except Exception as e:
