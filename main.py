@@ -29,16 +29,36 @@ def send_line_message(message, target_id):
     except Exception as e:
         st.sidebar.error(f"❌ ระบบส่ง LINE ขัดข้อง: {e}")
 
-# --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน ---
+# --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน (เวอร์ชัน Auto-Insert พนักงานใหม่) ---
 def check_permission(user_id):
+    if not user_id or user_id == "admin01":  # ข้ามไอดีทดสอบพิเศษ
+        return "admin"
+        
     try:
         db = get_connection()
         with db.cursor() as cursor:
+            # 1. ตรวจสอบก่อนว่าไอดี LINE นี้เคยมีในตาราง users หรือยัง
             cursor.execute("SELECT role FROM users WHERE line_user_id = %s", (user_id,))
             result = cursor.fetchone()
-        return result[0] if result else "Guest"
+            
+            if result:
+                # ถ้ามีอยู่แล้ว ส่งสิทธิ์ปัจจุบันกลับไปทำงานตามปกติ
+                return result[0]
+            else:
+                # 🚀 [จุดสำคัญ] ถ้าเป็นคนใหม่แกะกล่อง แอบยัดรหัสลงตาราง users รอไว้เลย!
+                insert_sql = """
+                    INSERT INTO users (line_user_id, name, role) 
+                    VALUES (%s, %s, %s)
+                """
+                # ตั้งชื่อเริ่มต้นเป็นรหัสตัว U และให้สิทธิ์เป็น guest เพื่อความปลอดภัย
+                cursor.execute(insert_sql, (user_id, f"พนักงานใหม่ ({user_id[:6]}...)", "guest"))
+                db.commit()
+                return "guest"
     except Exception as e:
         return "Guest"
+    finally:
+        if 'db' in locals() and db.open:
+            db.close()
 
 st.set_page_config(page_title="ระบบจัดการรถ Multi-Role", layout="wide")
 
@@ -70,7 +90,6 @@ menu_options = []
 current_role = user_role.strip().lower()
 
 if current_role == "admin":
-    # เพิ่ม "👥 จัดการพนักงาน" เข้าไปต่อท้ายหรือแทรกกลางได้เลยครับ
     menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "👥 จัดการพนักงาน", "🚖 งานของฉัน (Driver)", "✈️ Airport Staff"]
 elif current_role == "booker":
     menu_options = ["➕ Booker"]
@@ -114,7 +133,6 @@ if "Dashboard" in choice:
             cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'driver'")
             count_drivers = cursor.fetchone()[0]
             
-            # ปรับปรุง SQL หน้าแดชบอร์ดให้ดึงรหัส Voucher No มาโชว์ด้วย
             cursor.execute("SELECT id, voucher_no, passenger_name, pickup_location, dropoff_location, status FROM bookings ORDER BY id DESC LIMIT 5")
             recent_data = cursor.fetchall()
             
@@ -152,7 +170,7 @@ if "Dashboard" in choice:
                 "* **driver01** : ดูงานของตัวเองและกดรับงาน\n"
                 "* **driver02** : ดูงานของคนขับคนที่ 2")
 
-# หน้าที่ 2: Booker (ฟังก์ชันรันระบบเลข Voucher อัตโนมัติ)
+# หน้าที่ 2: Booker
 elif "Booker" in choice:
     st.title("📋 แบบฟอร์มจองรถ (Booker)")
     st.subheader("กรอกรายละเอียดการเดินทางเพื่อส่งงานให้ผู้จัดสรรรถ")
@@ -184,22 +202,18 @@ elif "Booker" in choice:
             with st.spinner("กำลังคำนวณรหัสและบันทึกข้อมูลลงระบบคลาวด์..."):
                 try:
                     db = get_connection()
-                    
-                    # 🚀 คำนวณรันนิ่งนัมเบอร์อัตโนมัติ (ฟอร์แมต VC + ปีเดือนปัจจุบัน + 5หลัก)
                     now = dt_module.datetime.now()
-                    year_month_str = now.strftime("%Y%m") # ผลลัพธ์: '202605'
+                    year_month_str = now.strftime("%Y%m")
                     
                     with db.cursor() as cursor:
-                        # ค้นหาจำนวนงานของเดือนนี้เพื่อนำมาบวกต่อยอดเลขถัดไป
                         count_sql = "SELECT COUNT(*) FROM bookings WHERE voucher_no LIKE %s"
                         cursor.execute(count_sql, (f"VC{year_month_str}%",))
                         current_count = cursor.fetchone()[0]
                         
                         next_number = current_count + 1
-                        running_no = str(next_number).zfill(5) # เติมศูนย์หน้าให้ครบ 5 หลัก
-                        auto_voucher_no = f"VC{year_month_str}{running_no}" # ประกอบร่างเป็น 'VC20260500001'
+                        running_no = str(next_number).zfill(5)
+                        auto_voucher_no = f"VC{year_month_str}{running_no}"
                         
-                        # บันทึกลงตารางฐานข้อมูลคลาวด์
                         sql = """
                             INSERT INTO bookings (voucher_no, passenger_name, pickup_location, dropoff_location, booking_time, status)
                             VALUES (%s, %s, %s, %s, %s, %s)
@@ -223,7 +237,6 @@ elif "Dispatcher" in choice:
     try:
         db = get_connection()
         with db.cursor() as cursor:
-            # เพิ่มคอลัมน์ voucher_no เข้าไปใน SQL แสดงผล
             query_bookings = "SELECT id, voucher_no, passenger_name, pickup_location, dropoff_location, booking_time, status, driver_id FROM bookings ORDER BY booking_time DESC"
             cursor.execute(query_bookings)
             bookings_data = cursor.fetchall()
@@ -255,7 +268,6 @@ elif "Dispatcher" in choice:
         pending_jobs = df_bookings[df_bookings['status'] == 'Pending']
         
         if not pending_jobs.empty:
-            # ดึงเลขรหัส Voucher No มาสลักบนกล่อง Dropdown ให้เห็นเด่นชัด
             job_options = {
                 f"🆔 {row['voucher_no']} | คุณ {row['passenger_name']} ({row['pickup_location']} ➡️ {row['dropoff_location']})": row['id']
                 for _, row in pending_jobs.iterrows()
@@ -297,7 +309,6 @@ elif "Dispatcher" in choice:
                                 cursor.execute(sql_update, (driver_id_to_assign, current_id, job_id_to_update))
                                 db.commit()
                                 
-                            # แนบข้อมูลเลขรหัส Voucher อัตโนมัติส่งแจ้งเตือนเข้าแอป LINE ไปหาคนขับรถ
                             msg_to_line = (
                                 f"🔔 มีงานใหม่เข้าครับ!\n"
                                 f"🎫 Voucher No: {selected_job_data['voucher_no']}\n"
@@ -330,7 +341,6 @@ elif "Driver" in choice:
     try:
         db = get_connection()
         with db.cursor() as cursor:
-            # เพิ่มคอลัมน์ voucher_no เข้าไปในตารางงานคนขับ
             query_driver = """
                 SELECT id, voucher_no, passenger_name, pickup_location, dropoff_location, booking_time, status 
                 FROM bookings 
@@ -377,13 +387,11 @@ elif "Driver" in choice:
                 st.write(" ")
                 btn_accept_job = st.button("✅ กดรับทราบและยอมรับงาน")
                 
-            # --- ส่วนที่ 3: กระบวนการหลังกดปุ่มรับงาน (เวอร์ชันยิง LINE กลับหาแอดมิน) ---
             if btn_accept_job:
                 with st.spinner("กำลังอัปเดตสถานะรับงานและแจ้งเตือนแอดมิน..."):
                     try:
                         db = get_connection()
                         with db.cursor() as cursor:
-                            # 1. ก่อนจะอัปเดต ขอแอบดึงเลข Voucher และรหัส dispatcher_id ผู้จ่ายงานออกมาก่อน
                             info_sql = "SELECT voucher_no, dispatcher_id, passenger_name FROM bookings WHERE id = %s"
                             cursor.execute(info_sql, (job_id_to_accept,))
                             job_info = cursor.fetchone()
@@ -392,12 +400,10 @@ elif "Driver" in choice:
                             disp_id = job_info[1] if job_info else None
                             p_name = job_info[2] if job_info else "ไม่ระบุ"
 
-                            # 2. สั่งอัปเดตสถานะในตาราง bookings จาก 'Assigned' ให้กลายเป็น 'Accepted'
                             sql_accept = "UPDATE bookings SET status = 'Accepted' WHERE id = %s"
                             cursor.execute(sql_accept, (job_id_to_accept,))
                             db.commit()
                             
-                            # 3. ถ้างานนี้มีรหัสแอดมินผู้จ่ายงานผูกอยู่ ให้ส่ง LINE เด้งกลับไปบอกเขาทันที!
                             if disp_id:
                                 msg_back_to_admin = (
                                     f"✅ คนขับกดรับงานแล้วครับ!\n"
@@ -428,7 +434,6 @@ elif "Airport Staff" in choice:
     try:
         db = get_connection()
         with db.cursor() as cursor:
-            # ดึงรหัสคอลัมน์ b.voucher_no ขึ้นตารางเพื่อให้แผนกสนามบินตรวจสอบรหัสรถ
             query_airport = """
                 SELECT 
                     b.id AS 'ใบงานที่',
@@ -478,21 +483,45 @@ elif "Airport Staff" in choice:
             
     else:
         st.info("ℹ️ ปัจจุบันยังไม่มีรถยนต์คันไหนกำลังเดินทางมาสนามบิน (ไม่มีงานค้างในสถานะ Assigned หรือ Accepted)")
-# --- หน้าที่ 6: เมนูพิเศษสำหรับ Admin จัดการพนักงาน ---
+
+# หน้าที่ 6: เมนูพิเศษสำหรับ Admin จัดการพนักงาน
 elif "จัดการพนักงาน" in choice:
     st.title("👥 ระบบจัดการสิทธิ์ผู้ใช้งาน (User Management)")
     st.write("---")
     
+    # 🌟 1. ดึงตารางพนักงานใหม่ที่รออนุมัติสิทธิ์มาโชว์ก่อนเลย
+    st.write("### ⏳ รายชื่อพนักงานใหม่ที่รออนุมัติสิทธิ์ (Guests)")
+    try:
+        db = get_connection()
+        with db.cursor() as cursor:
+            cursor.execute("SELECT line_user_id, name, role FROM users WHERE role = 'guest' ORDER BY id DESC")
+            guests_data = cursor.fetchall()
+        
+        if guests_data:
+            df_guests = pd.DataFrame(guests_data, columns=['รหัส LINE User ID', 'ชื่อชั่วคราว', 'สถานะ'])
+            st.dataframe(df_guests, use_container_width=True)
+            st.info("💡 คุณกล้าสามารถก๊อปปี้รหัส LINE ID จากตารางด้านบนมาวางในฟอร์มด้านล่างเพื่ออัปเดตสิทธิ์ได้ทันทีครับ")
+        else:
+            st.success("✨ เรียบร้อยดี! ไม่มีพนักงานใหม่ค้างรออนุมัติสิทธิ์ในระบบครับ")
+    except Exception as e:
+        st.error(f"เกิดข้อผิดพลาดในการดึงข้อมูล Guest: {e}")
+    finally:
+        if 'db' in locals() and db.open:
+            db.close()
+
+    st.write("---")
+    
+    # 📝 2. ฟอร์มสำหรับกรอกชื่อและเลือก Role
     with st.form("user_management_form"):
-        st.write("📝 ลงทะเบียนและกำหนดสิทธิ์พนักงานใหม่")
-        new_line_id = st.text_input("ระบุ LINE User ID").strip()
-        new_name = st.text_input("ระบุชื่อ-นามสกุล พนักงาน").strip()
+        st.write("📝 กรอกชื่อและปรับระดับสิทธิ์พนักงาน")
+        new_line_id = st.text_input("ระบุ LINE User ID (ก๊อปปี้จากตารางด้านบนมาวางได้เลย)").strip()
+        new_name = st.text_input("ระบุชื่อ-นามสกุลจริง ของพนักงาน").strip()
         new_role = st.selectbox(
             "กำหนดตำแหน่ง (Role)", 
             ["admin", "booker", "dispatcher", "driver", "airportstaff"]
         )
         
-        submit_user = st.form_submit_button("💾 บันทึกสิทธิ์เข้าระบบ")
+        submit_user = st.form_submit_button("💾 อนุมัติและบันทึกสิทธิ์")
         
         if submit_user:
             if new_line_id and new_name:
@@ -510,21 +539,20 @@ elif "จัดการพนักงาน" in choice:
                     cursor.close()
                     conn.close()
                     
-                    st.success(f"🎉 บันทึกสิทธิ์คุณ {new_name} เป็น {new_role} เรียบร้อยแล้ว!")
+                    st.success(f"🎉 อัปเดตสิทธิ์คุณ {new_name} เป็น {new_role} เรียบร้อยแล้ว!")
                     st.rerun()
                 except Exception as e:
                     st.error(f"❌ เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
             else:
                 st.warning("⚠️ รบกวนกรอก LINE ID และชื่อพนักงานให้ครบถ้วนครับ")
                 
-# 💡 [โค้ดเสริมเพิ่มความโปร] ดึงตารางรายชื่อพนักงานทั้งหมดในระบบมาโชว์ให้ Admin ตรวจสอบ
+    # 💡 [จัดระเบียบย่อหน้าใหม่สำเร็จ] ดึงตารางรายชื่อพนักงานทั้งหมดในระบบมาโชว์ให้ Admin ตรวจสอบ (แสดงผลเฉพาะหน้า Admin เท่านั้น)
     st.write("---")
     st.write("### 📋 รายชื่อพนักงานและระดับสิทธิ์ปัจจุบันในคลาวด์")
     
     try:
         db = get_connection()
         with db.cursor() as cursor:
-            # ดึงข้อมูลพนักงานทั้งหมดเรียงตามตำแหน่ง
             cursor.execute("SELECT line_user_id, name, role FROM users ORDER BY role ASC")
             users_data = cursor.fetchall()
             
@@ -540,4 +568,4 @@ elif "จัดการพนักงาน" in choice:
         st.error(f"❌ ไม่สามารถดึงตารางรายชื่อพนักงานได้: {e}")
     finally:
         if 'db' in locals() and db.open:
-            db.close()                
+            db.close()
