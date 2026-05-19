@@ -386,12 +386,12 @@ elif "Dispatcher" in choice:
                     
                     # ข้อความแจ้งเตือนคนขับคนใหม่
                     push_msg = f"🔔 คุณมีงานเข้าใหม่/สลับงานฉุกเฉิน\n🎫 Voucher: {old_job_data[0]}\n👤 ผู้โดยสาร: {old_job_data[1]}\n📊 โปรดตรวจสอบที่หน้างานของฉันบนระบบ"
-                    send_line_push(driver_id_target, push_msg)
+                    send_line_message(driver_id_target, push_msg) # 👈 แก้ไขเป็นชื่อที่ถูกต้องแล้ว
                     
-                    # ถ้าเป็นการสลับงานจากคนเดิม (แจ้งเตือนคนเดิมด้วยว่างานถูกถอนออกไปแล้วเพื่อไม่ให้เขาสับสน)
+                    # ถ้าเป็นการสลับงานจากคนเดิม
                     if old_job_data[2] == 'Assigned' and old_job_data[3] != driver_id_target:
                         cancel_msg = f"⚠️ แจ้งเตือนฉุกเฉิน:\n🎫 งาน Voucher: {old_job_data[0]} ของผู้โดยสารคุณ {old_job_data[1]} ได้ถูกโอนย้ายให้คนขับท่านอื่นดูแลแทนแล้วครับ"
-                        send_line_push(old_job_data[3], cancel_msg)
+                        send_line_message(old_job_data[3], cancel_msg) # 👈 แก้ไขเป็นชื่อที่ถูกต้องแล้ว
                         
                     st.rerun()
                 except Exception as e:
