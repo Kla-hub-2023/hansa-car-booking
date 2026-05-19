@@ -612,53 +612,62 @@ elif "จัดการพนักงาน" in choice:
     try:
         db = get_connection()
         with db.cursor() as cursor:
-            # ดึงมาทั้งหมดเพื่อทำระบบเลือกจัดการข้อมูลพนักงานเก่า
             cursor.execute("SELECT line_user_id, name, role, status FROM users")
             all_users = cursor.fetchall()
-        user_list_options = {f"👤 {u[1]} ({u[2].upper()}) - [{u[3]}]": u for u in all_users}
+        user_list_options = {f"👤 {u[1]} ({u[2].upper()}) - [{u[3] if u[3] else 'Active'}]": u for u in all_users}
     except Exception as e:
         user_list_options = {}
     finally:
         if 'db' in locals() and db.open:
             db.close()
 
-    # 🏢 แบ่งสัดส่วนฟอร์มควบคุม (ซ้าย: ฟอร์มจัดการ/อัปเดตข้อมูล | ขวา: ฟอร์มสั่งลบ)
+    # 🏢 แบ่งสัดส่วนควบคุม (ซ้าย: ฟอร์มจัดการ/อัปเดตข้อมูล | ขวา: ฟอร์มสั่งลบ)
     col_form_edit, col_form_del = st.columns([2, 1])
 
     with col_form_edit:
-        with st.form("user_management_form"):
-            st.write("📝 **ฟอร์มลงทะเบียน / แก้ไข และ ปรับสถานะพนักงาน**")
-            
-            # ช้อยส์เสริม: ถ้าจะแก้ไขคนเก่าให้เลือกจากกล่อง หากจะเพิ่มคนใหม่ให้เลือก "➕ เพิ่ม/บันทึกด้วยแมนนวล"
-            select_user_action = st.selectbox(
-                "💡 เลือกพนักงานที่ต้องการแก้ไข (หรือกรอกรหัสเองด้านล่าง)", 
-                options=["➕ ลงทะเบียนพนักงานใหม่ / กรอกเอง"] + list(user_list_options.keys())
-            )
-            
-            # ค่าตั้งต้นในช่องพิมพ์
-            init_id = ""
-            init_name = ""
-            init_role = "driver"
-            init_status = "Active"
-            
-            # ถ้าเลือกคนขับคนเดิม ดึงค่าเก่ามาสลักลงกล่องพิมพ์ทันทีออโต้!
-            if select_user_action != "➕ ลงทะเบียนพนักงานใหม่ / กรอกเอง":
-                user_data = user_list_options[select_user_action]
-                init_id = user_data[0]
-                init_name = user_data[1]
-                init_role = user_data[2].lower()
-                # เช็กกรณีค่า status เก่าในเบสเป็น NULL ให้ตั้งเป็น Active
-                init_status = user_data[3] if user_data[3] else "Active"
+        st.write("📝 **ระบบลงทะเบียน / แก้ไข และ ปรับสถานะพนักงาน**")
+        
+        # 🚀 [ย้ายมาอยู่นอกฟอร์ม] เพื่อให้เวลาเปลี่ยนชื่อแล้ว ค่าในกล่องด้านล่างเปลี่ยนตามทันทีออโต้!
+        select_user_action = st.selectbox(
+            "💡 เลือกพนักงานที่ต้องการแก้ไข (หรือเลือกเพิ่มคนใหม่)", 
+            options=["➕ ลงทะเบียนพนักงานใหม่ / กรอกเอง"] + list(user_list_options.keys())
+        )
+        
+        # ตั้งค่าตัวแปรเริ่มต้นสำหรับสลักลงกล่องพิมพ์
+        init_id = ""
+        init_name = ""
+        init_role = "driver"
+        init_status = "Active"
+        
+        # ถ้าเลือกพนักงานเดิม ดึงค่าจากตัวแปรดิบมาเตรียมไว้ทันที
+        if select_user_action != "➕ ลงทะเบียนพนักงานใหม่ / กรอกเอง":
+            user_data = user_list_options[select_user_action]
+            init_id = user_data[0]
+            init_name = user_data[1]
+            init_role = user_data[2].lower() if user_data[2] else "driver"
+            init_status = user_data[3] if user_data[3] else "Active"
 
+        # 📦 เริ่มต้นฟอร์มสำหรับรับค่าและกดบันทึก
+        with st.form("user_management_form", clear_on_submit=False):
+            
+            # บังคับอัปเดตค่าด้วยพารามิเตอร์ value และ index
             new_line_id = st.text_input("ระบุ LINE User ID", value=init_id).strip()
             new_name = st.text_input("ระบุชื่อ-นามสกุลจริง ของพนักงาน", value=init_name).strip()
             
             roles_pool = ["admin", "booker", "dispatcher", "driver", "airportstaff", "guest"]
-            new_role = st.selectbox("กำหนดตำแหน่ง (Role)", roles_pool, index=roles_pool.index(init_role) if init_role in roles_pool else 3)
+            new_role = st.selectbox(
+                "กำหนดตำแหน่ง (Role)", 
+                roles_pool, 
+                index=roles_pool.index(init_role) if init_role in roles_pool else 3
+            )
             
-            # 🚀 [เพิ่มใหม่] ปุ่มเลือกสถานะพนักงานใช้งาน Active / Inactive
             status_pool = ["Active", "Inactive"]
-            new_status = st.radio("🚦 สถานะการใช้งานระบบ", status_pool, index=status_pool.index(init_status) if init_status in status_pool else 0, horizontal=True)
+            new_status = st.radio(
+                "🚦 สถานะการใช้งานระบบ", 
+                status_pool, 
+                index=status_pool.index(init_status) if init_status in status_pool else 0, 
+                horizontal=True
+            )
             
             submit_user = st.form_submit_button("💾 อนุมัติและบันทึกสิทธิ์")
             
@@ -668,7 +677,6 @@ elif "จัดการพนักงาน" in choice:
                         conn = get_connection()
                         cursor = conn.cursor()
                         
-                        # อัปเดตข้อมูลทับตัวเดิม พร้อมบันทึกคอลัมน์ status
                         sql = """
                             INSERT INTO users (line_user_id, name, role, status) 
                             VALUES (%s, %s, %s, %s)
