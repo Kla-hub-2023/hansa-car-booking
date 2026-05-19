@@ -29,7 +29,7 @@ def send_line_message(message, target_id):
     except Exception as e:
         st.sidebar.error(f"❌ ระบบส่ง LINE ขัดข้อง: {e}")
 
-# --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน (เวอร์ชัน Auto-Insert พนักงานใหม่) ---
+# --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน (เวอร์ชันบล็อกคนที่เป็น Inactive) ---
 def check_permission(user_id):
     if not user_id or user_id == "admin01":  # ข้ามไอดีทดสอบพิเศษ
         return "admin"
@@ -37,15 +37,22 @@ def check_permission(user_id):
     try:
         db = get_connection()
         with db.cursor() as cursor:
-            cursor.execute("SELECT role FROM users WHERE line_user_id = %s", (user_id,))
+            # 1. ดึงทั้งสิทธิ์และสถานะการใช้งานออกมาตรวจสอบ
+            cursor.execute("SELECT role, status FROM users WHERE line_user_id = %s", (user_id,))
             result = cursor.fetchone()
             
             if result:
-                return result[0]
+                role_res = result[0]
+                status_res = result[1] if result[1] else "Active"
+                
+                # 🚨 ถ้าสถานะเป็น Inactive จะโดนปรับสิทธิ์ลดเหลือแค่ guest ทันที ทำให้เข้าใช้งานเมนูอื่นไม่ได้
+                if status_res == "Inactive":
+                    return "guest"
+                return role_res
             else:
                 insert_sql = """
-                    INSERT INTO users (line_user_id, name, role) 
-                    VALUES (%s, %s, %s)
+                    INSERT INTO users (line_user_id, name, role, status) 
+                    VALUES (%s, %s, %s, 'Active')
                 """
                 cursor.execute(insert_sql, (user_id, f"พนักงานใหม่ ({user_id[:6]}...)", "guest"))
                 db.commit()
