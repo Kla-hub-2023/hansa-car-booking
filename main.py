@@ -207,7 +207,7 @@ if "Dashboard" in choice:
                 "* **driver01** : ดูงานของตัวเองและกดรับงาน\n"
                 "* **driver02** : ดูงานของคนขับคนที่ 2")
 
-# หน้าที่ 2: Booker
+# หน้าที่ 2: Booker (เวอร์ชันปลดล็อก คีย์พิมพ์จุดรับ-จุดส่งเองได้อิสระ)
 elif "Booker" in choice:
     st.title("📋 แบบฟอร์มจองรถ (Booker)")
     st.subheader("กรอกรายละเอียดการเดินทางเพื่อส่งงานให้ผู้จัดสรรรถ")
@@ -216,9 +216,17 @@ elif "Booker" in choice:
         st.write("### 🚗 ข้อมูลการเดินทาง")
         
         passenger_name = st.text_input("👤 ชื่อผู้โดยสาร / คณะเดินทาง", placeholder="เช่น คุณสมชาย สายลุย")
-        locations = ["สนามบินสุวรรณภูมิ", "สนามบินดอนเมือง", "โรงแรมฮันซ่า", "ตัวเมืองกรุงเทพฯ", "พัทยา", "หัวหิน"]
-        pickup_location = st.selectbox("📍 จุดรับ (Pickup)", options=locations)
-        dropoff_location = st.selectbox("🏁 จุดส่ง (Dropoff)", options=locations)
+        
+        # 🚀 [ปรับใหม่] เปลี่ยนจาก st.selectbox เป็น st.text_input เพื่อเปิดให้คีย์ข้อมูลได้เองอย่างอิสระ
+        pickup_location = st.text_input(
+            "📍 จุดรับ (Pickup)", 
+            placeholder="กรอกจุดรับ เช่น สนามบินสุวรรณภูมิ, โรงแรมฮันซ่า, พัทยา"
+        ).strip()
+        
+        dropoff_location = st.text_input(
+            "🏁 จุดส่ง (Dropoff)", 
+            placeholder="กรอกจุดส่ง เช่น ตัวเมืองกรุงเทพฯ, หัวหิน, คอนโด A"
+        ).strip()
         
         st.write("📅 วันและเวลาเดินทาง")
         col1, col2 = st.columns(2)
@@ -233,7 +241,9 @@ elif "Booker" in choice:
     if submit_button:
         if not passenger_name.strip():
             st.error("⚠️ กรุณากรอกชื่อผู้โดยสารก่อนกดบันทึกครับ")
-        elif pickup_location == dropoff_location:
+        elif not pickup_location or not dropoff_location:
+            st.error("⚠️ กรุณาระบุข้อมูลจุดรับและจุดส่งให้ครบถ้วนก่อนบันทึกครับ")
+        elif pickup_location.lower() == dropoff_location.lower():
             st.error("⚠️ จุดรับและจุดส่งห้ามเป็นสถานที่เดียวกันครับ")
         else:
             with st.spinner("กำลังคำนวณรหัสและบันทึกข้อมูลลงระบบคลาวด์..."):
@@ -260,6 +270,7 @@ elif "Booker" in choice:
                         db.commit()
                         
                     st.success(f"🎉 บันทึกการจองสำเร็จ! เลขใบงานของคุณคือ: **{auto_voucher_no}** ข้อมูลอัปเดตเรียลไทม์")
+                    st.rerun()
                 except Exception as e:
                     st.error(f"❌ เกิดข้อผิดพลาดระหว่างบันทึกข้อมูล: {e}")
                 finally:
