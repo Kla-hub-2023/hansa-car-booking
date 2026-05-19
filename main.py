@@ -574,11 +574,12 @@ elif "Airport Staff" in choice:
     else:
         st.info("ℹ️ ปัจจุบันยังไม่มีรถยนต์คันไหนกำลังเดินทางมาสนามบิน")
 
-# หน้าที่ 6: เมนูพิเศษสำหรับ Admin จัดการพนักงาน
+# --- หน้าที่ 6: เมนูพิเศษสำหรับ Admin จัดการพนักงาน (เวอร์ชันอัปเกรด แก้ไข/ลบ/ระงับสิทธิ์) ---
 elif "จัดการพนักงาน" in choice:
     st.title("👥 ระบบจัดการสิทธิ์ผู้ใช้งาน (User Management)")
     st.write("---")
     
+    # 🌟 1. ดึงตารางพนักงานใหม่ที่รออนุมัติสิทธิ์มาโชว์ก่อน
     st.write("### ⏳ รายชื่อพนักงานใหม่ที่รออนุมัติสิทธิ์ (Guests)")
     try:
         db = get_connection()
@@ -588,7 +589,6 @@ elif "จัดการพนักงาน" in choice:
         
         if guests_data:
             df_guests = pd.DataFrame(guests_data, columns=['รหัส LINE User ID', 'ชื่อชั่วคราว', 'สถานะ'])
-            # 🌟 จุดปรับปรุงที่ 6: ซ่อนดัชนีตัวเลขในตารางพนักงานใหม่ (Guest) ที่รออนุมัติ
             st.dataframe(df_guests, use_container_width=True, hide_index=True)
             st.info("💡 คุณกล้าสามารถก๊อปปี้รหัส LINE ID จากตารางด้านบนมาวางเพื่ออัปเดตสิทธิ์ได้ครับ")
         else:
@@ -601,54 +601,127 @@ elif "จัดการพนักงาน" in choice:
 
     st.write("---")
     
-    with st.form("user_management_form"):
-        st.write("📝 กรอกชื่อและปรับระดับสิทธิ์พนักงาน")
-        new_line_id = st.text_input("ระบุ LINE User ID").strip()
-        new_name = st.text_input("ระบุชื่อ-นามสกุลจริง ของพนักงาน").strip()
-        new_role = st.selectbox(
-            "กำหนดตำแหน่ง (Role)", 
-            ["admin", "booker", "dispatcher", "driver", "airportstaff"]
-        )
-        
-        submit_user = st.form_submit_button("💾 อนุมัติและบันทึกสิทธิ์")
-        
-        if submit_user:
-            if new_line_id and new_name:
-                try:
-                    conn = get_connection()
-                    cursor = conn.cursor()
-                    
-                    sql = """
-                        INSERT INTO users (line_user_id, name, role) 
-                        VALUES (%s, %s, %s)
-                        ON DUPLICATE KEY UPDATE name = %s, role = %s
-                    """
-                    cursor.execute(sql, (new_line_id, new_name, new_role, new_name, new_role))
-                    conn.commit()
-                    cursor.close()
-                    conn.close()
-                    
-                    st.success(f"🎉 อัปเดตสิทธิ์คุณ {new_name} เป็น {new_role} เรียบร้อยแล้ว!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"❌ เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
-            else:
-                st.warning("⚠️ รบกวนกรอก LINE ID และชื่อพนักงานให้ครบถ้วนครับ")
-                
-    st.write("---")
-    st.write("### 📋 รายชื่อพนักงานและระดับสิทธิ์ปัจจุบันในคลาวด์")
-    
+    # 🌟 2. ดึงรายชื่อพนักงานทั้งหมดมาทำ Dropdown เพื่อเลือก "แก้ไข หรือ ลบ"
     try:
         db = get_connection()
         with db.cursor() as cursor:
-            cursor.execute("SELECT line_user_id, name, role FROM users ORDER BY role ASC")
+            # ดึงมาทั้งหมดเพื่อทำระบบเลือกจัดการข้อมูลพนักงานเก่า
+            cursor.execute("SELECT line_user_id, name, role, status FROM users")
+            all_users = cursor.fetchall()
+        user_list_options = {f"👤 {u[1]} ({u[2].upper()}) - [{u[3]}]": u for u in all_users}
+    except Exception as e:
+        user_list_options = {}
+    finally:
+        if 'db' in locals() and db.open:
+            db.close()
+
+    # 🏢 แบ่งสัดส่วนฟอร์มควบคุม (ซ้าย: ฟอร์มจัดการ/อัปเดตข้อมูล | ขวา: ฟอร์มสั่งลบ)
+    col_form_edit, col_form_del = st.columns([2, 1])
+
+    with col_form_edit:
+        with st.form("user_management_form"):
+            st.write("📝 **ฟอร์มลงทะเบียน / แก้ไข และ ปรับสถานะพนักงาน**")
+            
+            # ช้อยส์เสริม: ถ้าจะแก้ไขคนเก่าให้เลือกจากกล่อง หากจะเพิ่มคนใหม่ให้เลือก "➕ เพิ่ม/บันทึกด้วยแมนนวล"
+            select_user_action = st.selectbox(
+                "💡 เลือกพนักงานที่ต้องการแก้ไข (หรือกรอกรหัสเองด้านล่าง)", 
+                options=["➕ ลงทะเบียนพนักงานใหม่ / กรอกเอง"] + list(user_list_options.keys())
+            )
+            
+            # ค่าตั้งต้นในช่องพิมพ์
+            init_id = ""
+            init_name = ""
+            init_role = "driver"
+            init_status = "Active"
+            
+            # ถ้าเลือกคนขับคนเดิม ดึงค่าเก่ามาสลักลงกล่องพิมพ์ทันทีออโต้!
+            if select_user_action != "➕ ลงทะเบียนพนักงานใหม่ / กรอกเอง":
+                user_data = user_list_options[select_user_action]
+                init_id = user_data[0]
+                init_name = user_data[1]
+                init_role = user_data[2].lower()
+                # เช็กกรณีค่า status เก่าในเบสเป็น NULL ให้ตั้งเป็น Active
+                init_status = user_data[3] if user_data[3] else "Active"
+
+            new_line_id = st.text_input("ระบุ LINE User ID", value=init_id).strip()
+            new_name = st.text_input("ระบุชื่อ-นามสกุลจริง ของพนักงาน", value=init_name).strip()
+            
+            roles_pool = ["admin", "booker", "dispatcher", "driver", "airportstaff", "guest"]
+            new_role = st.selectbox("กำหนดตำแหน่ง (Role)", roles_pool, index=roles_pool.index(init_role) if init_role in roles_pool else 3)
+            
+            # 🚀 [เพิ่มใหม่] ปุ่มเลือกสถานะพนักงานใช้งาน Active / Inactive
+            status_pool = ["Active", "Inactive"]
+            new_status = st.radio("🚦 สถานะการใช้งานระบบ", status_pool, index=status_pool.index(init_status) if init_status in status_pool else 0, horizontal=True)
+            
+            submit_user = st.form_submit_button("💾 อนุมัติและบันทึกสิทธิ์")
+            
+            if submit_user:
+                if new_line_id and new_name:
+                    try:
+                        conn = get_connection()
+                        cursor = conn.cursor()
+                        
+                        # อัปเดตข้อมูลทับตัวเดิม พร้อมบันทึกคอลัมน์ status
+                        sql = """
+                            INSERT INTO users (line_user_id, name, role, status) 
+                            VALUES (%s, %s, %s, %s)
+                            ON DUPLICATE KEY UPDATE name = %s, role = %s, status = %s
+                        """
+                        cursor.execute(sql, (new_line_id, new_name, new_role, new_status, new_name, new_role, new_status))
+                        conn.commit()
+                        cursor.close()
+                        conn.close()
+                        
+                        st.success(f"🎉 บันทึกข้อมูลและอัปเดตสถานะพนักงานเรียบร้อยแล้ว!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
+                else:
+                    st.warning("⚠️ รบกวนกรอก LINE ID และชื่อพนักงานให้ครบถ้วนครับ")
+
+    with col_form_del:
+        with st.form("user_delete_form"):
+            st.write("❌ **โซนอันตราย: ลบพนักงานออกจากระบบ**")
+            user_to_delete = st.selectbox("เลือกรายชื่อที่จะลบทิ้งเด็ดขาด", options=list(user_list_options.keys()))
+            confirm_delete = st.checkbox("⚠️ ยืนยันว่าต้องการลบข้อมูลพนักงานคนนี้จริง ๆ")
+            
+            btn_delete = st.form_submit_button("🗑️ ลบพนักงานออกถาวร")
+            
+            if btn_delete:
+                if confirm_delete and user_to_delete:
+                    target_del_id = user_list_options[user_to_delete][0]
+                    target_del_name = user_list_options[user_to_delete][1]
+                    try:
+                        conn = get_connection()
+                        cursor = conn.cursor()
+                        cursor.execute("DELETE FROM users WHERE line_user_id = %s", (target_del_id,))
+                        conn.commit()
+                        cursor.close()
+                        conn.close()
+                        
+                        st.success(f"🗑️ ลบพนักงานคุณ {target_del_name} ออกจากระบบคลาวด์เรียบร้อย!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"ไม่สามารถลบพนักงานได้: {e}")
+                else:
+                    st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
+
+    st.write("---")
+    
+    # 🌟 3. ตารางแสดงรายชื่อพนักงานทั้งหมดปัจจุบัน (เพิ่มคอลัมน์สถานะโชว์ด้วย)
+    st.write("### 📋 รายชื่อพนักงานและระดับสิทธิ์ปัจจุบันในคลาวด์")
+    try:
+        db = get_connection()
+        with db.cursor() as cursor:
+            # แก้ไขสคริปต์ให้ดึงข้อมูลคอลัมน์ status ขึ้นมาโชว์บนตารางด้วย
+            cursor.execute("SELECT line_user_id, name, role, status FROM users ORDER BY role ASC")
             users_data = cursor.fetchall()
             
-        columns_users = ['รหัส LINE User ID', 'ชื่อ-นามสกุล พนักงาน', 'ตำแหน่ง (Role)']
+        columns_users = ['รหัส LINE User ID', 'ชื่อ-นามสกุล พนักงาน', 'ตำแหน่ง (Role)', 'สถานะการใช้งาน']
         df_users = pd.DataFrame(users_data, columns=columns_users)
         
         if not df_users.empty:
-            # 🌟 จุดปรับปรุงที่ 7: ซ่อนดัชนีตัวเลขในตารางรายชื่อพนักงานทั้งหมดในระบบของแอดมิน
+            # ซ่อนคอลัมน์ Index สวยงามตามสูตรเดิมของคุณกล้า
             st.dataframe(df_users, use_container_width=True, hide_index=True)
         else:
             st.info("ยังไม่มีข้อมูลผู้ใช้งานในระบบ")
