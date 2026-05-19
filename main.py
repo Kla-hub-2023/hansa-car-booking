@@ -207,7 +207,7 @@ if "Dashboard" in choice:
                 "* **driver01** : ดูงานของตัวเองและกดรับงาน\n"
                 "* **driver02** : ดูงานของคนขับคนที่ 2")
 
-# หน้าที่ 2: Booker (เวอร์ชันปลดล็อก คีย์พิมพ์จุดรับ-จุดส่งเองได้อิสระ)
+# หน้าที่ 2: Booker (เวอร์ชันเพิ่มตารางตรวจสอบรายการคีย์จองล่าสุด)
 elif "Booker" in choice:
     st.title("📋 แบบฟอร์มจองรถ (Booker)")
     st.subheader("กรอกรายละเอียดการเดินทางเพื่อส่งงานให้ผู้จัดสรรรถ")
@@ -217,7 +217,6 @@ elif "Booker" in choice:
         
         passenger_name = st.text_input("👤 ชื่อผู้โดยสาร / คณะเดินทาง", placeholder="เช่น คุณสมชาย สายลุย")
         
-        # 🚀 [ปรับใหม่] เปลี่ยนจาก st.selectbox เป็น st.text_input เพื่อเปิดให้คีย์ข้อมูลได้เองอย่างอิสระ
         pickup_location = st.text_input(
             "📍 จุดรับ (Pickup)", 
             placeholder="กรอกจุดรับ เช่น สนามบินสุวรรณภูมิ, โรงแรมฮันซ่า, พัทยา"
@@ -276,6 +275,36 @@ elif "Booker" in choice:
                 finally:
                     if 'db' in locals() and db.open:
                         db.close()
+
+    # 🚀 [เพิ่มใหม่] ตารางแสดงรายการที่คีย์ไปล่าสุด (กรองเฉพาะงานที่ยังไม่เสร็จสิ้น)
+    st.write("---")
+    st.write("### 🕒 รายการงานจองปัจจุบันที่คุณคีย์ในระบบ")
+    try:
+        db = get_connection()
+        with db.cursor() as cursor:
+            # ดึงงานที่อยู่ในสถานะ Pending และ Assigned มาส่องดูสถานะ
+            cursor.execute("""
+                SELECT voucher_no, passenger_name, pickup_location, dropoff_location, booking_time, status 
+                FROM bookings 
+                WHERE status IN ('Pending', 'Assigned')
+                ORDER BY booking_time ASC
+            """)
+            booker_jobs = cursor.fetchall()
+            
+        columns_booker = ['Voucher No.', 'ชื่อผู้โดยสาร', 'จุดรับ', 'จุดส่ง', 'เวลาเดินทาง', 'สถานะงาน']
+        df_booker = pd.DataFrame(booker_jobs, columns=columns_booker)
+        
+        if not df_booker.empty:
+            # ใช้สไตล์หล่อ ๆ ซ่อน Index ตารางให้คลีนสบายตาตามสูตรคุณกล้า
+            st.dataframe(df_booker, use_container_width=True, hide_index=True)
+        else:
+            st.info("💡 ปัจจุบันยังไม่มีรายการงานค้างในระบบครับ")
+            
+    except Exception as e:
+        st.error(f"❌ ไม่สามารถดึงรายการข้อมูลการจองมาแสดงได้: {e}")
+    finally:
+        if 'db' in locals() and db.open:
+            db.close()
 
 # --- หน้าที่ 3: เมนูสำหรับ Dispatcher (เวอร์ชันแสดงชื่อคนขับ + สลับงานฉุกเฉิน) ---
 elif "Dispatcher" in choice:
