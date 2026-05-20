@@ -47,7 +47,6 @@ def check_permission(user_id, line_name=None):
                     return "guest"
                 return role_res
             else:
-                # ถ้ายังไม่มีในระบบเลย ให้บันทึกเป็น Guest รอลงทะเบียน
                 if line_name and line_name.strip():
                     final_name = line_name.strip()
                 else:
@@ -82,7 +81,7 @@ st.markdown("""
 if "default_user_id" not in st.session_state:
     st.session_state["default_user_id"] = "admin01"
 
-# 🔍 โครงสร้างดักค่า URL จาก LINE
+# โครงสร้างดักค่า URL จาก LINE
 query_params = st.query_params
 if "user" in query_params:
     st.session_state.default_user_id = query_params["user"].strip()
@@ -119,7 +118,6 @@ elif current_role == "driver":
 elif current_role in ["airportstaff", "airport staff"]:
     menu_options = ["✈️ Airport Staff"]
 else:
-    # 🚀 [ปรับปรุงใหม่] แทนที่จะล็อกหน้าจอค้าง ให้ส่งเค้าไปเมนูพิเศษเพื่อพิมพ์ชื่อลงทะเบียนด่วน
     menu_options = ["📝 ลงทะเบียนพนักงานใหม่"]
 
 if "current_menu_choice" not in st.session_state or st.session_state["current_menu_choice"] not in menu_options:
@@ -139,7 +137,7 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
     st.warning("⚠️ บัญชีของคุณกำลังรอแอดมินอนุมัติสิทธิ์เข้าใช้งานระบบคิวรถครับ")
     
     st.write("---")
-    st.write("### 👤 กรุณากรอกข้อมูลของคุณเพื่อส่งให้คุณกล้าอนุมัติ")
+    st.write("### 👤 กรุณากรอกข้อมูลของคุณเพื่อส่งให้แอดมินอนุมัติ")
     
     with st.form("guest_register_form", clear_on_submit=True):
         st.info(f"🤖 รหัส LINE ID ระบบตรวจพบออโต้: `{current_id}`")
@@ -151,7 +149,6 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
                 try:
                     conn = get_connection()
                     cursor = conn.cursor()
-                    # อัปเดตชื่อจริงทับชื่อชั่วคราวในคลาวด์
                     cursor.execute("""
                         UPDATE users 
                         SET name = %s, role = 'guest', status = 'Active' 
@@ -160,7 +157,7 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
                     conn.commit()
                     cursor.close()
                     conn.close()
-                    st.success(f"🎉 ส่งข้อมูลรายงานตัวของคุณ '{reg_name}' สำเร็จแล้ว! รบกวนแจ้งคุณกล้าให้กดยอมรับสิทธิ์ในหน้าแผงควบคุมแอดมินครับ")
+                    st.success(f"🎉 ส่งข้อมูลรายงานตัวของคุณ '{reg_name}' สำเร็จแล้ว! รบกวนแจ้งแอดมินให้กดยอมรับสิทธิ์ในหน้าแผงควบคุมหลังบ้านครับ")
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาด: {e}")
             else:
@@ -169,7 +166,7 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
 # หน้าที่ 1: Dashboard
 elif "Dashboard" in choice:
     st.title("🏠 หน้าแรกและภาพรวมระบบ (Dashboard)")
-    st.markdown(f"สวัสดีครับคุณกล้า Status การเชื่อมต่อ **ระบบปกติดีเยี่ยม** ครับ")
+    st.markdown(f"สวัสดีครับแอดมิน Status การเชื่อมต่อ **ระบบปกติดีเยี่ยม** ครับ")
     st.write("---")
 
     try:
@@ -211,7 +208,7 @@ elif "Dashboard" in choice:
             
     with col_right:
         st.write("### 💡 แนะนำการใช้งาน")
-        st.info("คุณกล้าสามารถสลับบัญชีเพื่อทดสอบระบบได้:\n\n"
+        st.info("แอดมินสามารถสลับบัญชีเพื่อทดสอบระบบได้:\n\n"
                 "* **admin01** : จัดสรรงานและดูภาพรวมทั้งหมด\n"
                 "* **driver01** : ดูงานของตัวเองและกดรับงาน\n"
                 "* **driver02** : ดูงานของคนขับคนที่ 2")
@@ -393,7 +390,7 @@ elif "Dispatcher" in choice:
     with col_complete:
         st.write("### 🏁 บันทึกปิดงานเสร็จสิ้น (Completed)")
         if not df_bookings.empty:
-            active_jobs = df_bookings[df_bookings['สถานะงาน'] == 'Assigned']
+            active_jobs = df_bookings[df_bookings['status'] == 'Assigned']
             if not active_jobs.empty:
                 active_job_options = {f"✅ {row['Voucher No.']} - {row['ชื่อผู้โดยสาร']} ({row['คนขับที่รับงาน']})": row['id'] for index, row in active_jobs.iterrows()}
                 selected_active_job = st.selectbox("เลือกงานที่ต้องการปิดสถานะ", options=list(active_job_options.keys()))
@@ -545,7 +542,7 @@ elif "จัดการพนักงาน" in choice:
         if guests_data:
             df_guests = pd.DataFrame(guests_data, columns=['รหัส LINE User ID', 'ชื่อรายงานตัวพนักงาน', 'สถานะ'])
             st.dataframe(df_guests, use_container_width=True, hide_index=True)
-            st.info("💡 คุณกล้าสามารถก๊อปปี้รหัส LINE ID จากตารางด้านบนมาวางในกล่องแก้ไขเพื่ออัปเดตตำแหน่งได้ครับ")
+            st.info("💡 แอดมินสามารถก๊อปปี้รหัส LINE ID จากตารางด้านบนมาวางในกล่องแก้ไขเพื่ออัปเดตตำแหน่งได้ครับ")
         else: st.success("✨ เรียบร้อยดี! ไม่มีพนักงานใหม่ค้างรออนุมัติสิทธิ์ในระบบครับ")
     except Exception as e: st.error(f"เกิดข้อผิดพลาดในการดึงข้อมูล Guest: {e}")
     finally:
@@ -625,3 +622,18 @@ elif "จัดการพนักงาน" in choice:
                         conn.close()
                     except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
                 else: st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
+
+    st.write("---")
+    st.write("### 📋 รายชื่อพนักงานและระดับสิทธิ์ปัจจุบันในคลาวด์")
+    try:
+        db = get_connection()
+        with db.cursor() as cursor:
+            cursor.execute("SELECT line_user_id, name, role, status FROM users ORDER BY role ASC")
+            users_data = cursor.fetchall()
+        columns_users = ['รหัส LINE User ID', 'ชื่อ-นามสกุล พนักงาน', 'ตำแหน่ง (Role)', 'สถานะการใช้งาน']
+        df_users = pd.DataFrame(users_data, columns=columns_users)
+        if not df_users.empty: st.dataframe(df_users, use_container_width=True, hide_index=True)
+        else: st.info("ยังไม่มีข้อมูลผู้ใช้งานในระบบ")
+    except Exception as e: st.error(f"❌ ไม่สามารถดึงตารางรายชื่อพนักงานได้: {e}")
+    finally:
+        if 'db' in locals() and db.open: db.close()
