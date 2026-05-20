@@ -29,7 +29,7 @@ def send_line_message(message, target_id):
     except Exception as e:
         st.sidebar.error(f"❌ ระบบส่ง LINE ขัดข้อง: {e}")
 
-# --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน (เวอร์ชันปลอดภัย: ไม่แอบบันทึกข้อมูลขยะออโต้) ---
+# --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน ---
 def check_permission(user_id, line_name=None):
     if not user_id or user_id.strip() == "" or user_id.strip().lower() == "none" or user_id.startswith("GUEST_"):
         return "guest"
@@ -50,7 +50,6 @@ def check_permission(user_id, line_name=None):
                     return "guest"
                 return role_res
             else:
-                # 🛡️ ล็อกจุดนี้: ถ้าไม่มีรายชื่อในฐานข้อมูล ให้ส่งค่ากลับเป็น guest ไปแสดงบนจอเฉย ๆ ห้ามสั่ง INSERT ออโต้เด็ดขาด!
                 return "guest"
     except Exception as e:
         return "guest"
@@ -73,6 +72,10 @@ st.markdown("""
 if "default_user_id" not in st.session_state:
     st.session_state["default_user_id"] = ""
 
+# 📌 เพิ่มตัวแปรสำหรับจำสิทธิ์ชื่อจากไลน์ลงเบราว์เซอร์
+if "detected_line_name" not in st.session_state:
+    st.session_state["detected_line_name"] = ""
+
 # โครงสร้างดักค่า URL จาก LINE
 query_params = st.query_params
 if "user" in query_params:
@@ -80,6 +83,7 @@ if "user" in query_params:
     url_line_name = query_params.get("name", None)
     if url_line_name:
         url_line_name = url_line_name.strip()
+        st.session_state["detected_line_name"] = url_line_name  # จำค่าชื่อไลน์ที่ดักจับได้
     check_permission(st.session_state.default_user_id, line_name=url_line_name)
 
 st.sidebar.title("🔐 เข้าสู่ระบบ")
@@ -131,7 +135,9 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
     st.write("### 👤 กรุณากรอกข้อมูลรายงานตัวเพื่อส่งให้แอดมินอนุมัติ")
     
     with st.form("guest_register_form", clear_on_submit=True):
-        reg_name = st.text_input("1. ระบุ ชื่อ - นามสกุลจริงของคุณ", placeholder="เช่น นายสมชาย ใจดีมาก").strip()
+        # 🚀 1. จุดอัปเกรดสำคัญ: ดึงชื่อเล่น/ชื่อโปรไฟล์จาก LINE ดักจับมาแปะลงช่องพิมให้อัตโนมัติเลยครับ
+        init_input_name = st.session_state["detected_line_name"] if st.session_state["detected_line_name"] else ""
+        reg_name = st.text_input("1. ระบุ ชื่อ - นามสกุลจริงของคุณ", value=init_input_name, placeholder="เช่น นายสมชาย ใจดีมาก").strip()
         
         has_real_id = current_id and current_id.strip() != "" and not current_id.startswith("GUEST_")
         
@@ -154,7 +160,6 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
                 try:
                     conn = get_connection()
                     cursor = conn.cursor()
-                    # 📝 บันทึกข้อมูลเข้า DB ของจริงเฉพาะตอนกดปุ่มฟอร์มนี้เท่านั้น!
                     cursor.execute("""
                         INSERT INTO users (line_user_id, name, role, status)
                         VALUES (%s, %s, 'guest', 'Active')
