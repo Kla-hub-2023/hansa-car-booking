@@ -31,7 +31,7 @@ def send_line_message(message, target_id):
 
 # --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน ---
 def check_permission(user_id, line_name=None):
-    if not user_id or user_id.strip() == "" or user_id.strip().lower() == "none":
+    if not user_id or user_id.strip() == "" or user_id.strip().lower() == "none" or user_id.startswith("GUEST_"):
         return "guest"
         
     if user_id == "admin01":
@@ -141,20 +141,26 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
     st.write("### 👤 กรุณากรอกข้อมูลรายงานตัวเพื่อส่งให้แอดมินอนุมัติ")
     
     with st.form("guest_register_form", clear_on_submit=True):
-        # 🚀 จุดปรับปรุง: เปิดช่องให้พนักงานใหม่ระบุชื่อ และกรอก LINE User ID จริงของตัวเองได้เลยในหน้าเว็บ
         reg_name = st.text_input("1. ระบุ ชื่อ - นามสกุลจริงของคุณ", placeholder="เช่น นายสมชาย ใจดีมาก").strip()
         
-        # แสดงคำแนะนำวิธีคัดลอก ID เพื่อความเนี๊ยบหน้างาน
-        placeholder_id = current_id if (current_id and not current_id.startswith("GUEST_")) else "Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-        reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (ขึ้นต้นด้วยอักษรตัว U ยาว 33 หลัก)", value=placeholder_id, placeholder="คัดลอกรหัสไอดีจากแอปไลน์มาวางตรงนี้").strip()
+        # 🚀 จุดแก้ไขสำคัญ: ปรับปรุงโครงสร้างตรวจสอบไอดี ถ้ามีรหัสตัว U ส่งมาจาก LINE จริง จะสลักลงช่องให้ทันที
+        has_real_id = current_id and current_id.strip() != "" and not current_id.startswith("GUEST_")
         
+        if has_real_id:
+            reg_line_id = st.text_input("2. รหัส LINE User ID ของคุณ (ระบบตรวจพบอัตโนมัติ)", value=current_id, disabled=True)
+            final_target_id = current_id
+        else:
+            reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (ขึ้นต้นด้วยอักษรตัว U ยาว 33 หลัก)", placeholder="หากระบบไม่ขึ้นออโต้ ให้คัดลอกไอดีไลน์มาวางที่นี่")
+            final_target_id = reg_line_id
+            
         submit_reg = st.form_submit_button("🚀 ส่งข้อมูลลงทะเบียนระบบคิวรถ")
         
         if submit_reg:
+            cleaned_target_id = final_target_id.strip() if final_target_id else ""
             if not reg_name:
                 st.error("⚠️ กรุณากรอกชื่อ-นามสกุลจริงก่อนกดส่งข้อมูลครับ")
-            elif not reg_line_id or len(reg_line_id) < 10 or reg_line_id.lower() == "none":
-                st.error("⚠️ กรุณาระบุรหัส LINE User ID จริงของคุณให้ถูกต้องก่อนส่งครับ")
+            elif not cleaned_target_id or len(cleaned_target_id) < 15 or cleaned_target_id.lower() == "none" or cleaned_target_id.startswith("GUEST_"):
+                st.error("⚠️ ไม่สามารถลงทะเบียนได้เนื่องจากไม่พบรหัส LINE User ID ที่ถูกต้อง (รบกวนเปิดผ่านปุ่ม Register ในแอป LINE หรือคีย์ไอดีตัว U ของท่านครับ)")
             else:
                 try:
                     conn = get_connection()
@@ -163,11 +169,12 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
                         INSERT INTO users (line_user_id, name, role, status)
                         VALUES (%s, %s, 'guest', 'Active')
                         ON DUPLICATE KEY UPDATE name = %s, role = 'guest', status = 'Active'
-                    """, (reg_line_id, reg_name, reg_name))
+                    """, (cleaned_target_id, reg_name, reg_name))
                     conn.commit()
                     cursor.close()
                     conn.close()
                     st.success(f"🎉 ส่งข้อมูลรายงานตัวของพนักงานคุณ '{reg_name}' เรียบร้อย! รบกวนแจ้งแอดมินให้กดยอมรับสิทธิ์ในระบบหลังบ้านครับ")
+                    st.rerun()
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
 
@@ -529,7 +536,7 @@ elif "Airport Staff" in choice:
             if val == 'Accepted': return 'background-color: #d4edda; color: #155724; font-weight: bold;'
             elif val == 'Assigned': return 'background-color: #fff3cd; color: #856404;'
             return ''
-        st.dataframe(df_airport.style.map(highlight_status, subset=['html_status']), use_container_width=True, hide_index=True)
+        st.dataframe(df_airport.style.map(highlight_status, subset=['สถานะงาน']), use_container_width=True, hide_index=True)
         st.write("---")
         col_metrics1, col_metrics2 = st.columns(2)
         with col_metrics1: st.metric(label="🚖 จำนวนรถที่กำลังเดินทาง (Assigned)", value=len(df_airport[df_airport['สถานะงาน'] == 'Assigned']))
