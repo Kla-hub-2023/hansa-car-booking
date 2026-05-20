@@ -29,13 +29,12 @@ def send_line_message(message, target_id):
     except Exception as e:
         st.sidebar.error(f"❌ ระบบส่ง LINE ขัดข้อง: {e}")
 
-# --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน (ปรับปรุง: ป้องกันแครชสวมสิทธิ์แอดมินออโต้) ---
+# --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน ---
 def check_permission(user_id, line_name=None):
-    # ปรับปรุง: ถ้าไม่มีไอดี หรือไอดีเป็นค่าว่าง/ค่าเริ่มต้นที่ไม่ต้องการให้ล็อกอินออโต้ ให้ปรับเป็น guest ทันที
     if not user_id or user_id.strip() == "" or user_id.strip().lower() == "none":
         return "guest"
         
-    if user_id == "admin01":  # ข้ามไอดีทดสอบพิเศษสำหรับแอดมินแมนนวล
+    if user_id == "admin01":
         return "admin"
         
     try:
@@ -71,7 +70,6 @@ def check_permission(user_id, line_name=None):
 
 st.set_page_config(page_title="ระบบจัดการรถ Multi-Role", layout="wide")
 
-# สคริปต์สยบบั๊กหน้าจอมือถือและแก้ปัญหา Font ใหญ่ล้นจอ
 st.markdown("""
     <style>
     h1 { font-size: 1.4rem !important; padding-top: 0.3rem !important; padding-bottom: 0.3rem !important; line-height: 1.1 !important; }
@@ -82,7 +80,6 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# ปรับปรุง: ค่าเริ่มต้นในระบบเบราว์เซอร์ว่างเปล่าไว้ก่อนเพื่อความปลอดภัยของพนักงานใหม่
 if "default_user_id" not in st.session_state:
     st.session_state["default_user_id"] = ""
 
@@ -140,35 +137,39 @@ choice = st.sidebar.radio(
 if "ลงทะเบียนพนักงานใหม่" in choice:
     st.title("📝 ฟอร์มรายงานตัวและลงทะเบียนพนักงานใหม่")
     st.warning("⚠️ บัญชีของคุณกำลังรอแอดมินอนุมัติสิทธิ์เข้าใช้งานระบบคิวรถครับ")
-    
     st.write("---")
-    st.write("### 👤 กรุณากรอกข้อมูลของคุณเพื่อส่งให้แอดมินอนุมัติ")
+    st.write("### 👤 กรุณากรอกข้อมูลรายงานตัวเพื่อส่งให้แอดมินอนุมัติ")
     
     with st.form("guest_register_form", clear_on_submit=True):
-        st.info(f"🤖 รหัส LINE ID ระบบตรวจพบออโต้: `{current_id if current_id else 'Guest User'}`")
-        reg_name = st.text_input("ระบุ ชื่อ - นามสกุลจริงของคุณ", placeholder="เช่น นายสมชาย ใจดีมาก").strip()
+        # 🚀 จุดปรับปรุง: เปิดช่องให้พนักงานใหม่ระบุชื่อ และกรอก LINE User ID จริงของตัวเองได้เลยในหน้าเว็บ
+        reg_name = st.text_input("1. ระบุ ชื่อ - นามสกุลจริงของคุณ", placeholder="เช่น นายสมชาย ใจดีมาก").strip()
+        
+        # แสดงคำแนะนำวิธีคัดลอก ID เพื่อความเนี๊ยบหน้างาน
+        placeholder_id = current_id if (current_id and not current_id.startswith("GUEST_")) else "Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (ขึ้นต้นด้วยอักษรตัว U ยาว 33 หลัก)", value=placeholder_id, placeholder="คัดลอกรหัสไอดีจากแอปไลน์มาวางตรงนี้").strip()
+        
         submit_reg = st.form_submit_button("🚀 ส่งข้อมูลลงทะเบียนระบบคิวรถ")
         
         if submit_reg:
-            if reg_name:
+            if not reg_name:
+                st.error("⚠️ กรุณากรอกชื่อ-นามสกุลจริงก่อนกดส่งข้อมูลครับ")
+            elif not reg_line_id or len(reg_line_id) < 10 or reg_line_id.lower() == "none":
+                st.error("⚠️ กรุณาระบุรหัส LINE User ID จริงของคุณให้ถูกต้องก่อนส่งครับ")
+            else:
                 try:
                     conn = get_connection()
                     cursor = conn.cursor()
-                    # ตรวจสอบและลงทะเบียนไอดี
-                    final_id = current_id if current_id else f"GUEST_{datetime.now().strftime('%M%S')}"
                     cursor.execute("""
                         INSERT INTO users (line_user_id, name, role, status)
                         VALUES (%s, %s, 'guest', 'Active')
                         ON DUPLICATE KEY UPDATE name = %s, role = 'guest', status = 'Active'
-                    """, (final_id, reg_name, reg_name))
+                    """, (reg_line_id, reg_name, reg_name))
                     conn.commit()
                     cursor.close()
                     conn.close()
-                    st.success(f"🎉 ส่งข้อมูลรายงานตัวของคุณ '{reg_name}' สำเร็จแล้ว! รบกวนแจ้งแอดมินให้กดยอมรับสิทธิ์ในหน้าแผงควบคุมหลังบ้านครับ")
+                    st.success(f"🎉 ส่งข้อมูลรายงานตัวของพนักงานคุณ '{reg_name}' เรียบร้อย! รบกวนแจ้งแอดมินให้กดยอมรับสิทธิ์ในระบบหลังบ้านครับ")
                 except Exception as e:
-                    st.error(f"เกิดข้อผิดพลาด: {e}")
-            else:
-                st.error("⚠️ กรุณากรอกชื่อ-นามสกุลจริงก่อนกดส่งข้อมูลครับ")
+                    st.error(f"เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
 
 # หน้าที่ 1: Dashboard
 elif "Dashboard" in choice:
@@ -528,7 +529,7 @@ elif "Airport Staff" in choice:
             if val == 'Accepted': return 'background-color: #d4edda; color: #155724; font-weight: bold;'
             elif val == 'Assigned': return 'background-color: #fff3cd; color: #856404;'
             return ''
-        st.dataframe(df_airport.style.map(highlight_status, subset=['สถานะงาน']), use_container_width=True, hide_index=True)
+        st.dataframe(df_airport.style.map(highlight_status, subset=['html_status']), use_container_width=True, hide_index=True)
         st.write("---")
         col_metrics1, col_metrics2 = st.columns(2)
         with col_metrics1: st.metric(label="🚖 จำนวนรถที่กำลังเดินทาง (Assigned)", value=len(df_airport[df_airport['สถานะงาน'] == 'Assigned']))
@@ -640,7 +641,7 @@ elif "จัดการพนักงาน" in choice:
         columns_users = ['รหัส LINE User ID', 'ชื่อ-นามสกุล พนักงาน', 'ตำแหน่ง (Role)', 'สถานะการใช้งาน']
         df_users = pd.DataFrame(users_data, columns=columns_users)
         if not df_users.empty: st.dataframe(df_users, use_container_width=True, hide_index=True)
-        else: u.info("ยังไม่มีข้อมูลผู้ใช้งานในระบบ")
+        else: st.info("ยังไม่มีข้อมูลผู้ใช้งานในระบบ")
     except Exception as e: st.error(f"❌ ไม่สามารถดึงตารางรายชื่อพนักงานได้: {e}")
     finally:
         if 'db' in locals() and db.open: db.close()
