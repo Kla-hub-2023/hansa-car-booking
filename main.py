@@ -29,7 +29,7 @@ def send_line_message(message, target_id):
     except Exception as e:
         st.sidebar.error(f"❌ ระบบส่ง LINE ขัดข้อง: {e}")
 
-# --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน ---
+# --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน (เวอร์ชันปลอดภัย: ไม่แอบบันทึกข้อมูลขยะออโต้) ---
 def check_permission(user_id, line_name=None):
     if not user_id or user_id.strip() == "" or user_id.strip().lower() == "none" or user_id.startswith("GUEST_"):
         return "guest"
@@ -50,17 +50,7 @@ def check_permission(user_id, line_name=None):
                     return "guest"
                 return role_res
             else:
-                if line_name and line_name.strip():
-                    final_name = line_name.strip()
-                else:
-                    final_name = f"พนักงานใหม่ ({user_id[:6]}...)"
-                
-                insert_sql = """
-                    INSERT INTO users (line_user_id, name, role, status) 
-                    VALUES (%s, %s, %s, 'Active')
-                """
-                cursor.execute(insert_sql, (user_id, final_name, "guest"))
-                db.commit()
+                # 🛡️ ล็อกจุดนี้: ถ้าไม่มีรายชื่อในฐานข้อมูล ให้ส่งค่ากลับเป็น guest ไปแสดงบนจอเฉย ๆ ห้ามสั่ง INSERT ออโต้เด็ดขาด!
                 return "guest"
     except Exception as e:
         return "guest"
@@ -143,7 +133,6 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
     with st.form("guest_register_form", clear_on_submit=True):
         reg_name = st.text_input("1. ระบุ ชื่อ - นามสกุลจริงของคุณ", placeholder="เช่น นายสมชาย ใจดีมาก").strip()
         
-        # 🚀 จุดแก้ไขสำคัญ: ปรับปรุงโครงสร้างตรวจสอบไอดี ถ้ามีรหัสตัว U ส่งมาจาก LINE จริง จะสลักลงช่องให้ทันที
         has_real_id = current_id and current_id.strip() != "" and not current_id.startswith("GUEST_")
         
         if has_real_id:
@@ -165,6 +154,7 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
                 try:
                     conn = get_connection()
                     cursor = conn.cursor()
+                    # 📝 บันทึกข้อมูลเข้า DB ของจริงเฉพาะตอนกดปุ่มฟอร์มนี้เท่านั้น!
                     cursor.execute("""
                         INSERT INTO users (line_user_id, name, role, status)
                         VALUES (%s, %s, 'guest', 'Active')
