@@ -759,12 +759,18 @@ elif "จัดการพนักงาน" in choice:
                     try:
                         conn = get_connection()
                         cursor = conn.cursor()
+                        
+                        # 🚀 สเต็ปที่ 1: สั่งลบใบงานทดสอบทั้งหมดในตาราง bookings ที่ผูกกับพนักงานคนนี้ทิ้งทันที!
+                        cursor.execute("DELETE FROM bookings WHERE driver_id = %s", (target_del_id,))
+                        
+                        # 🚀 สเต็ปที่ 2: เมื่อตารางลูกสะอาดแล้ว สั่งลบตัวพนักงานออกจากตาราง users ได้ฉลุย
                         cursor.execute("DELETE FROM users WHERE line_user_id = %s", (target_del_id,))
+                        
                         conn.commit()
                         cursor.close()
                         conn.close()
                         
-                        st.success(f"🗑️ ลบพนักงานคุณ {target_del_name} ออกจากระบบคลาวด์เรียบร้อย!")
+                        st.success(f"🗑️ เคลียร์ข้อมูลทดสอบและลบคุณ {target_del_name} เรียบร้อยแล้ว!")
                         st.rerun()
                     except Exception as e:
                         st.error(f"ไม่สามารถลบพนักงานได้: {e}")
