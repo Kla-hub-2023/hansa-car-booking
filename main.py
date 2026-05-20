@@ -29,7 +29,7 @@ def send_line_message(message, target_id):
     except Exception as e:
         st.sidebar.error(f"❌ ระบบส่ง LINE ขัดข้อง: {e}")
 
-# --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน (เวอร์ชันรองรับ LINE LIFF Auto) ---
+# --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน (ปลอดภัย 100% ไม่สร้างรายชื่อผี) ---
 def check_permission(user_id, line_name=None):
     if not user_id or user_id.strip() == "" or user_id.strip().lower() == "none" or user_id.startswith("GUEST_"):
         return "guest"
@@ -75,19 +75,14 @@ if "default_user_id" not in st.session_state:
 if "detected_line_name" not in st.session_state:
     st.session_state["detected_line_name"] = ""
 
-# 📌 โครงสร้างดักค่าพารามิเตอร์แบบอัปเกรด (รองรับท่อส่งค่าจาก LINE LIFF)
+# โครงสร้างดักค่า URL จาก LINE
 query_params = st.query_params
 if "user" in query_params:
     st.session_state.default_user_id = query_params["user"].strip()
-elif "userId" in query_params: # รองรับบางระบบที่ส่งมาเป็นคำว่า userId
-    st.session_state.default_user_id = query_params["userId"].strip()
+    url_line_name = query_params.get("name", None)
+    if url_line_name:
+        st.session_state["detected_line_name"] = url_line_name.strip()
 
-if "name" in query_params:
-    st.session_state["detected_line_name"] = query_params["name"].strip()
-elif "displayName" in query_params: # รองรับระบบโปรไฟล์ที่ส่งมาเป็น displayName
-    st.session_state["detected_line_name"] = query_params["displayName"].strip()
-
-# เรียกเช็คสิทธิ์ใช้งานจริง
 if st.session_state.default_user_id:
     check_permission(st.session_state.default_user_id, line_name=st.session_state["detected_line_name"])
 
@@ -101,7 +96,7 @@ current_id = st.sidebar.text_input(
 st.session_state["default_user_id"] = current_id
 
 url_line_name = query_params.get("name", None)
-user_role = check_permission(current_id, line_name=url_line_name).strip().lower()
+user_role = check_permission(current_id, line_name=st.session_state["detected_line_name"]).strip().lower()
 st.sidebar.info(f"สิทธิ์ของคุณคือ: {user_role}")
 
 # --- 3. จัดการรายการเมนูฝั่งซ้ายตามระดับสิทธิ์ ---
@@ -140,7 +135,6 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
     st.write("### 👤 กรุณากรอกข้อมูลรายงานตัวเพื่อส่งให้แอดมินอนุมัติ")
     
     with st.form("guest_register_form", clear_on_submit=True):
-        # 🚀 1. จุดอัปเกรดสำคัญ: ดึงชื่อเล่น/ชื่อโปรไฟล์จาก LINE ดักจับมาแปะลงช่องพิมให้อัตโนมัติเลยครับ
         init_input_name = st.session_state["detected_line_name"] if st.session_state["detected_line_name"] else ""
         reg_name = st.text_input("1. ระบุ ชื่อ - นามสกุลจริงของคุณ", value=init_input_name, placeholder="เช่น นายสมชาย ใจดีมาก").strip()
         
@@ -150,7 +144,7 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
             reg_line_id = st.text_input("2. รหัส LINE User ID ของคุณ (ระบบตรวจพบอัตโนมัติ)", value=current_id, disabled=True)
             final_target_id = current_id
         else:
-            reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (ขึ้นต้นด้วยอักษรตัว U ยาว 33 หลัก)", placeholder="หากระบบไม่ขึ้นออโต้ ให้คัดลอกไอดีไลน์มาวางที่นี่")
+            reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (ขึ้นต้นด้วยอักษรตัว U ยาว 33 หลัก)", placeholder="คัดลอกไอดีไลน์มาวางที่นี่")
             final_target_id = reg_line_id
             
         submit_reg = st.form_submit_button("🚀 ส่งข้อมูลลงทะเบียนระบบคิวรถ")
