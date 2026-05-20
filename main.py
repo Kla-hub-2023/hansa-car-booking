@@ -5,6 +5,7 @@ import requests
 from datetime import datetime
 import io
 import datetime as dt_module
+import streamlit.components.v1 as components
 
 # --- 1. การตั้งค่าพื้นฐานและการเชื่อมต่อ DB ---
 def get_connection():
@@ -29,9 +30,9 @@ def send_line_message(message, target_id):
     except Exception as e:
         st.sidebar.error(f"❌ ระบบส่ง LINE ขัดข้อง: {e}")
 
-# --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน (ปลอดภัย 100% ไม่สร้างรายชื่อผี) ---
+# --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน ---
 def check_permission(user_id, line_name=None):
-    if not user_id or user_id.strip() == "" or user_id.strip().lower() == "none" or user_id.startswith("GUEST_"):
+    if not user_id or user_id.strip() == "" or user_id.strip().lower() == "none" or user_id.startswith("GUEST_") or "liff.userid" in user_id.lower():
         return "guest"
         
     if user_id == "admin01":
@@ -69,19 +70,51 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+# กำหนดตัวแปรจัดเก็บโปรไฟล์เริ่มต้น
 if "default_user_id" not in st.session_state:
     st.session_state["default_user_id"] = ""
-
 if "detected_line_name" not in st.session_state:
     st.session_state["detected_line_name"] = ""
 
-# โครงสร้างดักค่า URL จาก LINE
+# 🚀 [ล้ำสุด] ฝังสะพานเชื่อมสคริปต์ LINE LIFF SDK ดักจับประวัติโปรไฟล์แท้ 100% จากแอป LINE
+liff_html_bridge = """
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+    function initLiff() {
+        // ใช้รหัส ID ของไลน์ล็อกอินบ้านแอดมินกล้าโดยตรง
+        liff.init({ liffId: "2010148491-zYBksiiv" }).then(() => {
+            if (liff.isLoggedIn()) {
+                liff.getProfile().then(profile => {
+                    const params = new URLSearchParams(window.parent.location.search);
+                    // ตรวจเช็คเพื่อส่งค่ากลับเข้าสู่ฝั่ง Streamlit
+                    if (!params.has("user") || params.get("user") !== profile.userId) {
+                        window.parent.location.href = window.parent.location.origin + window.parent.location.pathname + "?user=" + encodeURIComponent(profile.userId) + "&name=" + encodeURIComponent(profile.displayName);
+                    }
+                });
+            } else {
+                liff.login();
+            }
+        }).catch((err) => {
+            console.log("LIFF Initialization failed", err);
+        });
+    }
+    document.addEventListener("DOMContentLoaded", initLiff);
+</script>
+"""
+# รันสะพานเชื่อมเงียบๆ หลังบ้าน
+components.html(liff_html_bridge, height=0, width=0)
+
+# โครงสร้างแกะพารามิเตอร์ดักค่าจากสะพานเชื่อม
 query_params = st.query_params
 if "user" in query_params:
-    st.session_state.default_user_id = query_params["user"].strip()
-    url_line_name = query_params.get("name", None)
-    if url_line_name:
-        st.session_state["detected_line_name"] = url_line_name.strip()
+    val_id = query_params["user"].strip()
+    if "liff.userid" not in val_id.lower():
+        st.session_state.default_user_id = val_id
+
+if "name" in query_params:
+    val_name = query_params["name"].strip()
+    if "liff.displayname" not in val_name.lower():
+        st.session_state["detected_line_name"] = val_name
 
 if st.session_state.default_user_id:
     check_permission(st.session_state.default_user_id, line_name=st.session_state["detected_line_name"])
@@ -95,7 +128,6 @@ current_id = st.sidebar.text_input(
 
 st.session_state["default_user_id"] = current_id
 
-url_line_name = query_params.get("name", None)
 user_role = check_permission(current_id, line_name=st.session_state["detected_line_name"]).strip().lower()
 st.sidebar.info(f"สิทธิ์ของคุณคือ: {user_role}")
 
@@ -397,7 +429,7 @@ elif "Dispatcher" in choice:
             st.info("ไม่มีรายการงานที่สามารถจ่ายหรือสลับได้ในขณะนี้")
 
     with col_complete:
-        st.write("### 🏁 บันทึกปิดงานเสร็จสิ้น (Completed)")
+        st.write("### 🏁 บันทึกปิดงานเสสิ้น (Completed)")
         if not df_bookings.empty:
             active_jobs = df_bookings[df_bookings['status'] == 'Assigned']
             if not active_jobs.empty:
