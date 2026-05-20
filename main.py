@@ -5,7 +5,6 @@ import requests
 from datetime import datetime
 import io
 import datetime as dt_module
-import streamlit.components.v1 as components
 
 # --- 1. การตั้งค่าพื้นฐานและการเชื่อมต่อ DB ---
 def get_connection():
@@ -32,7 +31,7 @@ def send_line_message(message, target_id):
 
 # --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน ---
 def check_permission(user_id, line_name=None):
-    if not user_id or user_id.strip() == "" or user_id.strip().lower() == "none" or user_id.startswith("GUEST_") or "liff.userid" in user_id.lower():
+    if not user_id or user_id.strip() == "" or user_id.strip().lower() == "none" or user_id.startswith("GUEST_"):
         return "guest"
         
     if user_id == "admin01":
@@ -70,54 +69,13 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# กำหนดตัวแปรจัดเก็บโปรไฟล์เริ่มต้น
 if "default_user_id" not in st.session_state:
     st.session_state["default_user_id"] = ""
-if "detected_line_name" not in st.session_state:
-    st.session_state["detected_line_name"] = ""
 
-# 🚀 [ล้ำสุด] ฝังสะพานเชื่อมสคริปต์ LINE LIFF SDK ดักจับประวัติโปรไฟล์แท้ 100% จากแอป LINE
-liff_html_bridge = """
-<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-<script>
-    function initLiff() {
-        // ใช้รหัส ID ของไลน์ล็อกอินบ้านแอดมินกล้าโดยตรง
-        liff.init({ liffId: "2010148491-zYBksiiv" }).then(() => {
-            if (liff.isLoggedIn()) {
-                liff.getProfile().then(profile => {
-                    const params = new URLSearchParams(window.parent.location.search);
-                    // ตรวจเช็คเพื่อส่งค่ากลับเข้าสู่ฝั่ง Streamlit
-                    if (!params.has("user") || params.get("user") !== profile.userId) {
-                        window.parent.location.href = window.parent.location.origin + window.parent.location.pathname + "?user=" + encodeURIComponent(profile.userId) + "&name=" + encodeURIComponent(profile.displayName);
-                    }
-                });
-            } else {
-                liff.login();
-            }
-        }).catch((err) => {
-            console.log("LIFF Initialization failed", err);
-        });
-    }
-    document.addEventListener("DOMContentLoaded", initLiff);
-</script>
-"""
-# รันสะพานเชื่อมเงียบๆ หลังบ้าน
-components.html(liff_html_bridge, height=0, width=0)
-
-# โครงสร้างแกะพารามิเตอร์ดักค่าจากสะพานเชื่อม
+# โครงสร้างดักค่า URL พื้นฐาน
 query_params = st.query_params
 if "user" in query_params:
-    val_id = query_params["user"].strip()
-    if "liff.userid" not in val_id.lower():
-        st.session_state.default_user_id = val_id
-
-if "name" in query_params:
-    val_name = query_params["name"].strip()
-    if "liff.displayname" not in val_name.lower():
-        st.session_state["detected_line_name"] = val_name
-
-if st.session_state.default_user_id:
-    check_permission(st.session_state.default_user_id, line_name=st.session_state["detected_line_name"])
+    st.session_state.default_user_id = query_params["user"].strip()
 
 st.sidebar.title("🔐 เข้าสู่ระบบ")
 
@@ -128,7 +86,7 @@ current_id = st.sidebar.text_input(
 
 st.session_state["default_user_id"] = current_id
 
-user_role = check_permission(current_id, line_name=st.session_state["detected_line_name"]).strip().lower()
+user_role = check_permission(current_id).strip().lower()
 st.sidebar.info(f"สิทธิ์ของคุณคือ: {user_role}")
 
 # --- 3. จัดการรายการเมนูฝั่งซ้ายตามระดับสิทธิ์ ---
@@ -159,7 +117,7 @@ choice = st.sidebar.radio(
 
 # --- 4. การแสดงเนื้อหาไส้ในของแต่ละเมนูตามหน้าเลือก ---
 
-# หน้าพิเศษ: สำหรับพนักงานใหม่สแกนเข้ามา (Guest Zone)
+# หน้าพิเศษ: สำหรับพนักงานใหม่ลงทะเบียน (Guest Zone)
 if "ลงทะเบียนพนักงานใหม่" in choice:
     st.title("📝 ฟอร์มรายงานตัวและลงทะเบียนพนักงานใหม่")
     st.warning("⚠️ บัญชีของคุณกำลังรอแอดมินอนุมัติสิทธิ์เข้าใช้งานระบบคิวรถครับ")
@@ -167,26 +125,19 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
     st.write("### 👤 กรุณากรอกข้อมูลรายงานตัวเพื่อส่งให้แอดมินอนุมัติ")
     
     with st.form("guest_register_form", clear_on_submit=True):
-        init_input_name = st.session_state["detected_line_name"] if st.session_state["detected_line_name"] else ""
-        reg_name = st.text_input("1. ระบุ ชื่อ - นามสกุลจริงของคุณ", value=init_input_name, placeholder="เช่น นายสมชาย ใจดีมาก").strip()
+        reg_name = st.text_input("1. ระบุ ชื่อ - นามสกุลจริงของคุณ", placeholder="เช่น นายสมชาย ใจดีมาก").strip()
         
-        has_real_id = current_id and current_id.strip() != "" and not current_id.startswith("GUEST_")
-        
-        if has_real_id:
-            reg_line_id = st.text_input("2. รหัส LINE User ID ของคุณ (ระบบตรวจพบอัตโนมัติ)", value=current_id, disabled=True)
-            final_target_id = current_id
-        else:
-            reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (ขึ้นต้นด้วยอักษรตัว U ยาว 33 หลัก)", placeholder="คัดลอกไอดีไลน์มาวางที่นี่")
-            final_target_id = reg_line_id
+        # ปรับช่องกรอก ID เป็นแบบปกติเพื่อให้พนักงานคัดลอกมาวางได้อย่างปลอดภัย
+        reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (ขึ้นต้นด้วยอักษรตัว U ยาว 33 หลัก)", placeholder="คัดลอกรหัสประจำตัว LINE ของท่านมาวางที่นี่")
             
         submit_reg = st.form_submit_button("🚀 ส่งข้อมูลลงทะเบียนระบบคิวรถ")
         
         if submit_reg:
-            cleaned_target_id = final_target_id.strip() if final_target_id else ""
+            cleaned_target_id = reg_line_id.strip() if reg_line_id else ""
             if not reg_name:
                 st.error("⚠️ กรุณากรอกชื่อ-นามสกุลจริงก่อนกดส่งข้อมูลครับ")
             elif not cleaned_target_id or len(cleaned_target_id) < 15 or cleaned_target_id.lower() == "none" or cleaned_target_id.startswith("GUEST_"):
-                st.error("⚠️ ไม่สามารถลงทะเบียนได้เนื่องจากไม่พบรหัส LINE User ID ที่ถูกต้อง (รบกวนเปิดผ่านปุ่ม Register ในแอป LINE หรือคีย์ไอดีตัว U ของท่านครับ)")
+                st.error("⚠️ กรุณาระบุรหัส LINE User ID ที่ถูกต้อง (รหัสตัว U ยาว 33 หลัก)")
             else:
                 try:
                     conn = get_connection()
@@ -429,7 +380,7 @@ elif "Dispatcher" in choice:
             st.info("ไม่มีรายการงานที่สามารถจ่ายหรือสลับได้ในขณะนี้")
 
     with col_complete:
-        st.write("### 🏁 บันทึกปิดงานเสสิ้น (Completed)")
+        st.write("### 🏁 บันทึกปิดงานเสร็จสิ้น (Completed)")
         if not df_bookings.empty:
             active_jobs = df_bookings[df_bookings['status'] == 'Assigned']
             if not active_jobs.empty:
