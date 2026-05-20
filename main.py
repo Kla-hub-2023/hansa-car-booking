@@ -619,4 +619,9 @@ elif "จัดการพนักงาน" in choice:
                         else:
                             cursor.execute("DELETE FROM users WHERE line_user_id = %s", (target_del_id,))
                             conn.commit()
-                            st.success(f"🗑️ ลบข้อมูลพนักงานทดสอบคุณ {target_del_name} เรีย
+                            st.success(f"🗑️ ลบข้อมูลพนักงานทดสอบคุณ {target_del_name} เรียบร้อยแล้ว!")
+                            st.rerun()
+                        cursor.close()
+                        conn.close()
+                    except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
+                else: st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
