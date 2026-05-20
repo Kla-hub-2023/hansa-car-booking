@@ -106,16 +106,19 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- ระบบล็อกอินอัจฉริยะ (เวอร์ชันเสถียร ล็อก ID เข้าฐานข้อมูลตรงจุด) ---
+# 🔍 โครงสร้างเดิมส่วนการดักค่า URL (ปรับเพิ่มตัวแปร name คู่กัน)
 query_params = st.query_params
 
-if "default_user_id" not in st.session_state:
-    st.session_state["default_user_id"] = "admin01"
-
 if "user" in query_params:
-    url_user = query_params["user"].strip()
-    if st.session_state["default_user_id"] != url_user:
-        st.session_state["default_user_id"] = url_user
+    st.session_state.user_id = query_params["user"].strip()
+    
+    # 🚀 [เพิ่มจุดนี้] ดักจับค่า &name= จาก URL เพิ่มเติม
+    url_line_name = query_params.get("name", None)
+    if url_line_name:
+        url_line_name = url_line_name.strip()
+        
+    # 🚀 ส่งค่าทั้งสองตัวเข้าไปที่ฟังก์ชัน check_permission
+    st.session_state.user_role = check_permission(st.session_state.user_id, line_name=url_line_name)
 
 st.sidebar.title("🔐 เข้าสู่ระบบ")
 
