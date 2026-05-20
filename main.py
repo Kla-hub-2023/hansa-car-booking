@@ -760,20 +760,24 @@ elif "จัดการพนักงาน" in choice:
                         conn = get_connection()
                         cursor = conn.cursor()
                         
-                        # 🚀 สเต็ปที่ 1: สั่งลบใบงานทดสอบทั้งหมดในตาราง bookings ที่ผูกกับพนักงานคนนี้ทิ้งทันที!
-                        cursor.execute("DELETE FROM bookings WHERE driver_id = %s", (target_del_id,))
+                        # 🚀 1. วิ่งไปเช็กก่อนว่า คนขับคนนี้เคยมีประวัติงานในตาราง bookings ไหม
+                        cursor.execute("SELECT COUNT(*) FROM bookings WHERE driver_id = %s", (target_del_id,))
+                        has_history = cursor.fetchone()[0]
                         
-                        # 🚀 สเต็ปที่ 2: เมื่อตารางลูกสะอาดแล้ว สั่งลบตัวพนักงานออกจากตาราง users ได้ฉลุย
-                        cursor.execute("DELETE FROM users WHERE line_user_id = %s", (target_del_id,))
-                        
-                        conn.commit()
+                        if has_history > 0:
+                            # 🛑 ถ้ามีประวัติงานจริง ระบบจะบล็อกทันที ไม่ยอมให้ลบเด็ดขาด!
+                            st.error(f"❌ ไม่สามารถลบคุณ {target_del_name} ได้ เนื่องจากมีประวัติการวิ่งงานในระบบแล้ว (แนะนำให้เปลี่ยนสถานะเป็น Inactive แทน เพื่อความปลอดภัยของข้อมูลบัญชี)")
+                        else:
+                            #  ถ้าเป็นผู้ใช้ทดสอบ (ไม่มีประวัติงานเลย) ถึงจะยอมให้ลบออกจากระบบได้ออโต้
+                            cursor.execute("DELETE FROM users WHERE line_user_id = %s", (target_del_id,))
+                            conn.commit()
+                            st.success(f"🗑️ ลบข้อมูลพนักงานทดสอบคุณ {target_del_name} เรียบร้อยแล้ว!")
+                            st.rerun()
+                            
                         cursor.close()
                         conn.close()
-                        
-                        st.success(f"🗑️ เคลียร์ข้อมูลทดสอบและลบคุณ {target_del_name} เรียบร้อยแล้ว!")
-                        st.rerun()
                     except Exception as e:
-                        st.error(f"ไม่สามารถลบพนักงานได้: {e}")
+                        st.error(f"เกิดข้อผิดพลาด: {e}")
                 else:
                     st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
 
