@@ -31,7 +31,7 @@ def send_line_message(message, target_id):
 
 # --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน ---
 def check_permission(user_id, line_name=None):
-    if not user_id or user_id.strip() == "" or user_id.strip().lower() == "none" or user_id.startswith("GUEST_"):
+    if not user_id or user_id.strip() == "" or user_id.strip().lower() == "none" or user_id.startswith("GUEST_") or "line.me" in user_id.lower():
         return "guest"
         
     if user_id == "admin01":
@@ -72,10 +72,18 @@ st.markdown("""
 if "default_user_id" not in st.session_state:
     st.session_state["default_user_id"] = ""
 
-# โครงสร้างดักค่า URL พื้นฐาน
+# โครงสร้างดักค่า URL แกะรหัสตัว U
 query_params = st.query_params
 if "user" in query_params:
-    st.session_state.default_user_id = query_params["user"].strip()
+    raw_user = query_params["user"].strip()
+    # ดักกรองกรณีระบบ LINE คืนค่ากลับมาเป็นลิงก์ยาว ให้ดึงเฉพาะรหัสตัว U ตัวท้ายสุดมาใช้งาน
+    if "line.me/R/app/" in raw_user:
+        processed_id = raw_user.split("line.me/R/app/")[-1].strip()
+    else:
+        processed_id = raw_user
+    
+    if processed_id and not processed_id.startswith("http"):
+        st.session_state.default_user_id = processed_id
 
 st.sidebar.title("🔐 เข้าสู่ระบบ")
 
@@ -127,17 +135,24 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
     with st.form("guest_register_form", clear_on_submit=True):
         reg_name = st.text_input("1. ระบุ ชื่อ - นามสกุลจริงของคุณ", placeholder="เช่น นายสมชาย ใจดีมาก").strip()
         
-        # ปรับช่องกรอก ID เป็นแบบปกติเพื่อให้พนักงานคัดลอกมาวางได้อย่างปลอดภัย
-        reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (ขึ้นต้นด้วยอักษรตัว U ยาว 33 หลัก)", placeholder="คัดลอกรหัสประจำตัว LINE ของท่านมาวางที่นี่")
+        # ล็อกช่องให้อัตโนมัติ ถ้าระบบแกะรหัสตัว U สำเร็จ
+        has_real_id = current_id and current_id.strip() != "" and not current_id.startswith("GUEST_")
+        
+        if has_real_id:
+            reg_line_id = st.text_input("2. รหัส LINE User ID ของคุณ (ระบบตรวจพบอัตโนมัติ)", value=current_id, disabled=True)
+            final_target_id = current_id
+        else:
+            reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (ขึ้นต้นด้วยอักษรตัว U ยาว 33 หลัก)", placeholder="หากรหัสไม่ขึ้นออโต้ โปรดเปิดผ่านหน้าแชท LINE บัญชี Hunsa ครับ")
+            final_target_id = reg_line_id
             
         submit_reg = st.form_submit_button("🚀 ส่งข้อมูลลงทะเบียนระบบคิวรถ")
         
         if submit_reg:
-            cleaned_target_id = reg_line_id.strip() if reg_line_id else ""
+            cleaned_target_id = final_target_id.strip() if final_target_id else ""
             if not reg_name:
                 st.error("⚠️ กรุณากรอกชื่อ-นามสกุลจริงก่อนกดส่งข้อมูลครับ")
             elif not cleaned_target_id or len(cleaned_target_id) < 15 or cleaned_target_id.lower() == "none" or cleaned_target_id.startswith("GUEST_"):
-                st.error("⚠️ กรุณาระบุรหัส LINE User ID ที่ถูกต้อง (รหัสตัว U ยาว 33 หลัก)")
+                st.error("⚠️ ระบบไม่สามารถลงทะเบียนได้เนื่องจากตรวจไม่พบรหัส LINE User ID ประจำตัวเครื่องของท่านครับ")
             else:
                 try:
                     conn = get_connection()
@@ -150,7 +165,7 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
                     conn.commit()
                     cursor.close()
                     conn.close()
-                    st.success(f"🎉 ส่งข้อมูลรายงานตัวของพนักงานคุณ '{reg_name}' เรียบร้อย! รบกวนแจ้งแอดมินให้กดยอมรับสิทธิ์ในระบบหลังบ้านครับ")
+                    st.success(f"🎉 ส่งข้อมูลรายงานตัวของพนักงานคุณ '{reg_name}' เรียบร้อย! รบกวนแจ้งแอดมินให้กดยอบรับสิทธิ์ในระบบหลังบ้านครับ")
                     st.rerun()
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
