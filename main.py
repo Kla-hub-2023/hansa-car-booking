@@ -30,7 +30,7 @@ def send_line_message(message, target_id):
         st.sidebar.error(f"❌ ระบบส่ง LINE ขัดข้อง: {e}")
 
 # --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน (เวอร์ชันบล็อกคนที่เป็น Inactive) ---
-def check_permission(user_id):
+def check_permission(user_id, line_name=None):
     if not user_id or user_id == "admin01":  # ข้ามไอดีทดสอบพิเศษ
         return "admin"
         
@@ -50,15 +50,23 @@ def check_permission(user_id):
                     return "guest"
                 return role_res
             else:
+                # 🚀 จุดที่ปรับปรุง: เช็กว่ามีชื่อ LINE ส่งผ่านมาด้วยหรือไม่ 
+                # ถ้าพนักงานมีชื่อ LINE ส่งมา จะใช้ชื่อนั้นทันที ถ้าไม่มีจะใช้ฟอร์แมตพนักงานใหม่ดั้งเดิมครับ
+                if line_name and line_name.strip():
+                    final_name = line_name.strip()
+                else:
+                    final_name = f"พนักงานใหม่ ({user_id[:6]}...)"
+                
                 insert_sql = """
                     INSERT INTO users (line_user_id, name, role, status) 
                     VALUES (%s, %s, %s, 'Active')
                 """
-                cursor.execute(insert_sql, (user_id, f"พนักงานใหม่ ({user_id[:6]}...)", "guest"))
+                # นำชื่อ final_name บันทึกลงฐานข้อมูลคลาวด์ออโต้
+                cursor.execute(insert_sql, (user_id, final_name, "guest"))
                 db.commit()
                 return "guest"
     except Exception as e:
-        return "Guest"
+        return "guest"
     finally:
         if 'db' in locals() and db.open:
             db.close()
