@@ -5,9 +5,8 @@ import requests
 from datetime import datetime
 import io
 import datetime as dt_module
-import streamlit.components.v1 as components
 
-# --- 1. การตั้งค่าพื้นฐานและการเชื่อมต่อ DB ---
+# --- 1. การตั้งค่า基礎และการเชื่อมต่อ DB ---
 def get_connection():
     return pymysql.connect(
         host='mysql-22653bef-kla-e55d.c.aivencloud.com',
@@ -84,7 +83,7 @@ st.markdown("""
 if "default_user_id" not in st.session_state:
     st.session_state["default_user_id"] = ""
 
-# ดักรับค่าพารามิเตอร์ URL ตรวจสอบความสะอาดของข้อมูล
+# 📌 ดักจับแกะรอยค่าพารามิเตอร์ URL ที่สมบูรณ์และล้างค่าขยะ
 query_params = st.query_params
 if "user" in query_params:
     val = query_params["user"].strip()
@@ -98,7 +97,6 @@ current_id = st.sidebar.text_input(
     value=st.session_state["default_user_id"]
 ).strip()
 
-# เคลียร์ค่าขยะทิ้งถ้าเป็นลิงก์หลงเหลือมา
 if "http" in current_id.lower() or "line.me" in current_id.lower():
     current_id = ""
 
@@ -118,7 +116,7 @@ elif current_role == "booker":
 elif current_role == "dispatcher":
     menu_options = ["🖥️ Dispatcher"]
 elif current_role == "driver":
-    menu_options = ["🚖 งานของฉัน (Driver)"]
+    menu_options = ["𚖖 งานของฉัน (Driver)"]
 elif current_role in ["airportstaff", "airport staff"]:
     menu_options = ["✈️ Airport Staff"]
 else:
@@ -140,62 +138,30 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
     st.warning("⚠️ บัญชีของคุณกำลังรอแอดมินอนุมัติสิทธิ์เข้าใช้งานระบบคิวรถครับ")
     st.write("---")
     
-    st.markdown("### 🔍 วิธีการคัดลอกรหัส LINE User ID")
-    st.info("สำหรับพนักงานใหม่: ให้เปิดหน้าลิงก์นี้ในโปรแกรม LINE จากนั้นกดปุ่มคัดลอกรหัสเครื่องสีเขียวด้านล่าง เพื่อเอาไอดีตัว U 33 หลักมาวางในช่องสมัครครับ 👇")
-
-    # 🚀 ทางออกสากล: ฝังปุ่ม JavaScript ดึงค่าโปรไฟล์สากลจากสิทธิ์ของหน้าต่าง Webview LINE ตรงๆ
-    js_button_html = """
-    <div style="background-color:#f8f9fa; padding:15px; border-radius:8px; border:1px solid #e9ecef; text-align:center;">
-        <button id="btn-get-id" style="background-color:#28a745; color:white; border:none; padding:12px 24px; font-size:16px; font-weight:bold; border-radius:5px; cursor:pointer; width:100%; max-width:350px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
-            🟢 คลิกเพื่อเรียกดูรหัส LINE ID ประจำเครื่อง
-        </button>
-        <p style="margin-top:10px; font-size:13px; color:#6c757d;">กรุณากดปุ่มด้านบน จากนั้นรหัสตัว U ของคุณจะปรากฏขึ้นในกล่องข้อความด้านล่างอัตโนมัติ</p>
-        <input type="text" id="line-id-output" style="width:100%; max-width:400px; padding:10px; font-size:14px; font-family:monospace; text-align:center; border:2px dashed #28a745; border-radius:4px; margin-top:5px; background-color:#ffffff;" readonly placeholder="รหัสตัว U จะแสดงที่นี่...">
-    </div>
-
-    <script>
-    document.getElementById('btn-get-id').addEventListener('click', function() {
-        // ดึงข้อมูลผ่านตัวแปรแวดล้อมภายใน Webview ของแอป LINE อัตโนมัติ
-        try {
-            const urlParams = new URLSearchParams(window.parent.location.search);
-            let extractedId = urlParams.get('user') || '';
-            
-            if (!extractedId || extractedId.includes('http')) {
-                // ตรวจสอบค่าภายใน window location ตรงๆ เพื่อความแม่นยำสูงสุด
-                const currentUrl = window.parent.location.href;
-                const match = currentUrl.match(/[?&]user=([^&#]*)/);
-                extractedId = match ? match[1] : '';
-            }
-            
-            if (extractedId && !extractedId.includes('http')) {
-                document.getElementById('line-id-output').value = decodeURIComponent(extractedId);
-                alert("✨ คัดลอกไอดีของคุณสำเร็จแล้ว! กรุณานำรหัสไปใส่ในฟอร์มช่องที่ 2 ด้านล่างได้เลยครับ");
-            } else {
-                // กรณีทดสอบเปิดบนบราวเซอร์คอมปกติทั่วไปที่ไม่ได้เปิดผ่านแอป LINE
-                document.getElementById('line-id-output').value = "U" + Math.random().toString().substring(2, 12) + "demo" + Math.floor(Date.now() / 1000);
-                alert("💡 ระบบจำลองรหัสตัวอย่างให้เนื่องจากคุณไม่ได้เปิดหน้าเว็บนี้ผ่านแอปแชท LINE บนมือถือโดยตรง");
-            }
-        } catch(e) {
-            document.getElementById('line-id-output').value = "U102938475655bd849302910239485756";
-        }
-    });
-    </script>
-    """
-    components.html(js_button_html, height=160)
-    st.write("---")
+    # 🚀 โชว์กล่องข้อความต้อนรับและแสดงรหัสตัว U ของจริงให้เห็นทันทีเมื่อระบุค่าได้สำเร็จ
+    has_real_id = current_id and current_id.strip() != "" and len(current_id) > 15
+    
+    if has_real_id:
+        st.success(f"💚 **ระบบตรวจพบรหัส LINE User ID ประจำเครื่องของคุณสำเร็จ!**")
+        st.info("นี่คือรหัสประจำตัวของคุณในระบบคิวรถ Hunsa ครับ ระบบล็อกรหัสใส่ช่องด้านล่างให้เรียบร้อยแล้ว พนักงานใหม่เพียงแค่พิมพ์ชื่อ-นามสกุล แล้วกดปุ่มส่งข้อมูลได้เลยครับ")
+        st.code(current_id, language="text")
+        st.write("---")
+    else:
+        st.error("ℹ️ หากระบบไม่โชว์รหัสตัว U อัตโนมัติ รบกวนแจ้งแอดมินเพื่อขอรหัสผ่านหน้าห้องแชทไลน์มาวางสมัครได้ครับ")
+        st.write("---")
         
     st.write("### 👤 กรุณากรอกข้อมูลรายงานตัวเพื่อส่งให้แอดมินอนุมัติ")
     
     with st.form("guest_register_form", clear_on_submit=True):
         reg_name = st.text_input("1. ระบุ ชื่อ - นามสกุลจริงของคุณ", placeholder="เช่น นายสมชาย ใจดีมาก").strip()
-        reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (รหัสตัว U 33 หลัก)", value=current_id if current_id else "", placeholder="พิมพ์หรือวางรหัสตัว U ที่ได้จากปุ่มด้านบนลงที่นี่")
+        reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (รหัสตัว U 33 หลัก)", value=current_id if current_id else "", placeholder="รหัสตัว U ของคุณจะล็อกโชว์ที่นี่โดยอัตโนมัติ")
             
         submit_reg = st.form_submit_button("🚀 ส่งข้อมูลลงทะเบียนระบบคิวรถ")
         
         if submit_reg:
             cleaned_target_id = reg_line_id.strip() if reg_line_id else ""
             if "http" in cleaned_target_id.lower() or "line.me" in cleaned_target_id.lower() or len(cleaned_target_id) < 10:
-                st.error("⚠️ รหัส LINE User ID ไม่ถูกต้อง! กรุณาตรวจสอบและห้ามกรอกลิงก์เว็บไซต์ลงไปในช่องนี้ครับ")
+                st.error("⚠️ รหัส LINE User ID ไม่ถูกต้อง! กรุณาตรวจสอบรหัส และห้ามกรอกลิงก์เว็บไซต์ลงไปในช่องนี้ครับ")
             elif not reg_name:
                 st.error("⚠️ กรุณากรอกชื่อ-นามสกุลจริงก่อนกดส่งข้อมูลครับ")
             else:
@@ -215,7 +181,7 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
 
-# --- หน้าเมนูระบบจัดการอื่นๆ คงไว้ตามโครงสร้างเดิมของอู่เพื่อเสถียรภาพสูงสุด ---
+# --- โครงสร้างหน้าเมนูหลักอื่นๆ คงไว้ตามเดิมทั้งหมดเพื่อเสถียรภาพระบบคิวรถ ---
 elif "Dashboard" in choice:
     if current_role == "admin":
         st.success("👑 ยินดีต้อนรับกลับเข้าสู่ระบบครับ แอดมินกล้า (Admin Level Max) | ระบบความปลอดภัยยืนยันสิทธิ์ถูกต้องเรียบร้อย")
@@ -441,7 +407,7 @@ elif "Dispatcher" in choice:
             st.info("ไม่มีรายการงานที่สามารถจ่ายหรือสลับได้ในขณะนี้")
 
     with col_complete:
-        st.write("### 🏁 บันทึกปิดงานเสสิ้น (Completed)")
+        st.write("### 🏁 บันทึกปิดงานเสร็จสิ้น (Completed)")
         if not df_bookings.empty:
             active_jobs = df_bookings[df_bookings['status'] == 'Assigned']
             if not active_jobs.empty:
@@ -536,7 +502,7 @@ elif "Driver" in choice:
                     except Exception as e: st.error(f"❌ ไม่สามารถเปลี่ยนสถานะงานได้: {e}")
                     finally:
                         if 'db' in locals() and db.open: db.close()
-    else: st.success("✨ 沒有งานปัจจุบันค้างอยู่")
+    else: st.success("✨ ไม่มีงานปัจจุบันค้างอยู่")
 
     st.write("---")
     st.write("### ✅ ประวัติการวิ่งงานที่เสร็จสิ้นแล้ว (Completed)")
