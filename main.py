@@ -72,11 +72,10 @@ st.markdown("""
 if "default_user_id" not in st.session_state:
     st.session_state["default_user_id"] = ""
 
-# โครงสร้างดักค่า URL แกะรหัสตัว U
+# โครงสร้างดักค่า URL แกะรหัสตัว U จาก LINE OA
 query_params = st.query_params
 if "user" in query_params:
     raw_user = query_params["user"].strip()
-    # ดักกรองกรณีระบบ LINE คืนค่ากลับมาเป็นลิงก์ยาว ให้ดึงเฉพาะรหัสตัว U ตัวท้ายสุดมาใช้งาน
     if "line.me/R/app/" in raw_user:
         processed_id = raw_user.split("line.me/R/app/")[-1].strip()
     else:
@@ -127,6 +126,11 @@ choice = st.sidebar.radio(
 
 # หน้าพิเศษ: สำหรับพนักงานใหม่ลงทะเบียน (Guest Zone)
 if "ลงทะเบียนพนักงานใหม่" in choice:
+    # 🚀 จุดอัปเกรดสำคัญ: ตรวจเช็คว่าแกะรหัสตัว U สำเร็จใช่ไหม ถ้าใช่ พ่นกล่อง Message สีเขียวแจ้งเตือนต้อนรับทันทีด้านบนสุด!
+    has_real_id = current_id and current_id.strip() != "" and not current_id.startswith("GUEST_")
+    if has_real_id:
+        st.success(f"💚 ระบบดักจับโปรไฟล์สำเร็จ! ยินดีต้อนรับพนักงานรหัส LINE: **{current_id}** เข้าสู่ระบบคิวรถ Hunsa ครับ")
+
     st.title("📝 ฟอร์มรายงานตัวและลงทะเบียนพนักงานใหม่")
     st.warning("⚠️ บัญชีของคุณกำลังรอแอดมินอนุมัติสิทธิ์เข้าใช้งานระบบคิวรถครับ")
     st.write("---")
@@ -134,9 +138,6 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
     
     with st.form("guest_register_form", clear_on_submit=True):
         reg_name = st.text_input("1. ระบุ ชื่อ - นามสกุลจริงของคุณ", placeholder="เช่น นายสมชาย ใจดีมาก").strip()
-        
-        # ล็อกช่องให้อัตโนมัติ ถ้าระบบแกะรหัสตัว U สำเร็จ
-        has_real_id = current_id and current_id.strip() != "" and not current_id.startswith("GUEST_")
         
         if has_real_id:
             reg_line_id = st.text_input("2. รหัส LINE User ID ของคุณ (ระบบตรวจพบอัตโนมัติ)", value=current_id, disabled=True)
@@ -165,7 +166,7 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
                     conn.commit()
                     cursor.close()
                     conn.close()
-                    st.success(f"🎉 ส่งข้อมูลรายงานตัวของพนักงานคุณ '{reg_name}' เรียบร้อย! รบกวนแจ้งแอดมินให้กดยอบรับสิทธิ์ในระบบหลังบ้านครับ")
+                    st.success(f"🎉 ส่งข้อมูลรายงานตัวของพนักงานคุณ '{reg_name}' เรียบร้อย! รบกวนแจ้งแอดมินให้กดยอมรับสิทธิ์ในระบบหลังบ้านครับ")
                     st.rerun()
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
