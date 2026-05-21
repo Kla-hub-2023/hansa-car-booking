@@ -30,7 +30,7 @@ def send_line_message(message, target_id):
     except Exception as e:
         st.sidebar.error(f"❌ ระบบส่ง LINE ขัดข้อง: {e}")
 
-# --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน ---
+# --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน (ปรับปรุงเพื่อการทดสอบ) ---
 def check_permission(user_id, line_name=None):
     if not user_id or user_id.strip() == "" or user_id.strip().lower() == "none" or user_id.startswith("GUEST_") or "line.me" in user_id.lower():
         return "guest"
@@ -70,10 +70,11 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-if "default_user_id" not in st.session_state:
+# 📌 1. เคลียร์ความจำเครื่องเก่าทิ้งทันทีเพื่อให้แอดมินกลายเป็นพนักงานใหม่
+if "default_user_id" not in st.session_state or st.session_state["default_user_id"] == "admin01":
     st.session_state["default_user_id"] = ""
 
-# 📌 ดักรับค่าพารามิเตอร์แบบแกะรหัสผ่าน URL
+# ดักรับค่าพารามิเตอร์แบบแกะรหัสผ่าน URL จาก LINE
 query_params = st.query_params
 if "user" in query_params:
     raw_user = query_params["user"].strip()
@@ -84,7 +85,7 @@ if "user" in query_params:
     if processed_id and not processed_id.startswith("http"):
         st.session_state.default_user_id = processed_id
 
-# 🚀 ท่อสะพานเชื่อมต่อขอดึงสิทธิ์รหัสตัว U แท้จากระบบแอป LINE ส่งข้ามมาบราวเซอร์
+# 🚀 2. เปิดท่อสะพานเชื่อมต่อ LIFF เพื่อดูดรหัสตัว U แท้ส่งกลับเข้ามาที่หน้าฟอร์ม
 liff_id_bridge = """
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
@@ -150,6 +151,8 @@ choice = st.sidebar.radio(
 # หน้าพิเศษ: สำหรับพนักงานใหม่ลงทะเบียน (Guest Zone)
 if "ลงทะเบียนพนักงานใหม่" in choice:
     has_real_id = current_id and current_id.strip() != "" and not current_id.startswith("GUEST_")
+    
+    # 🚀 3. มหาเวทย์สีเขียว: เมื่อแกะค่ารหัสประจำตัวได้สำเร็จ พ่นบอกพนักงานใหม่ทันทีหน้างาน!
     if has_real_id:
         st.success(f"💚 ระบบดักจับโปรไฟล์สำเร็จ! ยินดีต้อนรับพนักงานรหัส LINE: **{current_id}** เข้าสู่ระบบคิวรถ Hunsa ครับ")
 
@@ -195,7 +198,6 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
 
 # หน้าที่ 1: Dashboard
 elif "Dashboard" in choice:
-    # 🚀 [จุดอัปเกรดไม้ตายตัวจบ] ดึงรหัสตัว U แท้ๆ จากตัวแปรพารามิเตอร์ URL ลิงก์ที่ส่งมาจากไลน์แอดมินมาแสดงในกรอบเขียวทันที!
     detected_url_id = query_params.get("user", "")
     if current_role == "admin":
         if detected_url_id:
@@ -251,7 +253,7 @@ elif "Dashboard" in choice:
                 "* **driver01** : ดูงานของตัวเองและกดรับงาน\n"
                 "* **driver02** : ดูงานของคนขับคนที่ 2")
 
-# --- โค้ดส่วนเมนูอื่นคงเดิมเพื่อความปลอดภัยของฐานข้อมูล ---
+# --- เมนูควบคุมอื่น ๆ คงเดิมตามมาตรฐานฐานข้อมูล ---
 elif "Booker" in choice:
     st.title("📋 แบบฟอร์มจองรถ (Booker)")
     st.subheader("กรอกรายละเอียดการเดินทางเพื่อส่งงานให้ผู้จัดสรรรถ")
