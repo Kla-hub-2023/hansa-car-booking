@@ -67,7 +67,7 @@ st.markdown("""
     .block-container { padding-top: 3.2rem !important; padding-bottom: 1rem !important; padding-left: 0.8rem !important; padding-right: 0.8rem !important; }
     .stDataFrame table { font-size: 0.8rem !important; }
     
-    /* ซ่อนปุ่มแดงควบคุมฝั่งขวาล่างสำหรับคนใช้งานทั่วไป */
+    /* ซ่อนปุ่มและแถบสีแดงควบคุมของระบบหลังบ้านเพื่อความเนี๊ยบ */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
@@ -84,29 +84,10 @@ st.markdown("""
 if "default_user_id" not in st.session_state:
     st.session_state["default_user_id"] = ""
 
-# 📌 ดักรับค่าพารามิเตอร์ลิงก์ URL
+# ดักรับค่าพารามิเตอร์ลิงก์ URL (กรณีเปิดผ่านระบบเบราว์เซอร์ปกติที่รองรับ)
 query_params = st.query_params
-extracted_id = ""
-
-# 🔎 เริ่มต้นพ่นรายงานตัวบอกสิทธิ์ในหน้าต่าง Log สีดำเบื้องหลัง
-print("\n--- [SYSTEM LOG] ตรวจพบการคลิกเชื่อมต่อเข้าสู่ระบบคิวรถ Hunsa ---")
-print(f"DEBUG URL พารามิเตอร์ทั้งหมดที่ส่งมา: {query_params}")
-
 if "user" in query_params:
-    extracted_id = query_params["user"].strip()
-    print(f"DEBUG แกะรอยจากคำสั่งปกติ (?user=): พบค่า -> {extracted_id}")
-elif "liff.state" in query_params:
-    raw_state = query_params["liff.state"].strip()
-    print(f"DEBUG แกะรอยจากท่อระบบ LINE LIFF State: พบข้อความยาว -> {raw_state}")
-    if "user=" in raw_state:
-        extracted_id = raw_state.split("user=")[-1].split("&")[0].strip()
-        print(f"DEBUG แกะรอยสำเร็จแยกได้เฉพาะรหัสไอดีตัว U ออกมาคือ -> {extracted_id}")
-
-if extracted_id and not extracted_id.startswith("http") and "line.me" not in extracted_id.lower():
-    st.session_state.default_user_id = extracted_id
-    print(f"🚀 [SUCCESS LOG] ทำการล็อกรหัส LINE ID ประจำเครื่องเข้าสู่หน้าฟอร์มสำเร็จ: {extracted_id}")
-else:
-    print("⚠️ [WARNING LOG] เครื่องนี้ไม่มีการพ่วงค่ารหัส LINE ID ข้ามฝั่งมา หน้าจอจะเปิดเป็นกล่องว่างเปล่า")
+    st.session_state.default_user_id = query_params["user"].strip()
 
 st.sidebar.title("🔐 เข้าสู่ระบบ")
 
@@ -150,9 +131,9 @@ choice = st.sidebar.radio(
 
 # หน้าพิเศษ: สำหรับพนักงานใหม่ลงทะเบียน (Guest Zone)
 if "ลงทะเบียนพนักงานใหม่" in choice:
-    has_real_id = current_id and current_id.strip() != "" and not current_id.startswith("GUEST_")
+    has_real_id = current_id and current_id.strip() != "" and not current_id.startswith("admin")
     if has_real_id:
-        st.success(f"💚 ระบบดักจับโปรไฟล์สำเร็จ! ยินดีต้อนรับพนักงานรหัส LINE: **{current_id}** เข้าสู่ระบบคิวรถ Hunsa ครับ")
+        st.success(f"💚 ตรวจพบรหัสสำหรับการลงทะเบียน: **{current_id}** พร้อมบันทึกเข้าสู่ฐานข้อมูลคิวรถ Hunsa ครับ")
 
     st.title("📝 ฟอร์มรายงานตัวและลงทะเบียนพนักงานใหม่")
     st.warning("⚠️ บัญชีของคุณกำลังรอแอดมินอนุมัติสิทธิ์เข้าใช้งานระบบคิวรถครับ")
@@ -161,22 +142,16 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
     
     with st.form("guest_register_form", clear_on_submit=True):
         reg_name = st.text_input("1. ระบุ ชื่อ - นามสกุลจริงของคุณ", placeholder="เช่น นายสมชาย ใจดีมาก").strip()
-        
-        if has_real_id:
-            reg_line_id = st.text_input("2. รหัส LINE User ID ของคุณ (ระบบตรวจพบอัตโนมัติ)", value=current_id, disabled=True)
-            final_target_id = current_id
-        else:
-            reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (ขึ้นต้นด้วยอักษรตัว U ยาว 33 หลัก)", placeholder="หากรหัสไม่ขึ้นออโต้ โปรดเปิดผ่านหน้าแชท LINE บัญชี Hunsa ครับ")
-            final_target_id = reg_line_id
+        reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (รหัสตัว U 33 หลักที่คัดลอกมาจากห้องแชท)", value=current_id if current_id else "", placeholder="วางรหัสประจำตัว LINE ของท่านที่นี่")
             
         submit_reg = st.form_submit_button("🚀 ส่งข้อมูลลงทะเบียนระบบคิวรถ")
         
         if submit_reg:
-            cleaned_target_id = final_target_id.strip() if final_target_id else ""
+            cleaned_target_id = reg_line_id.strip() if reg_line_id else ""
             if not reg_name:
                 st.error("⚠️ กรุณากรอกชื่อ-นามสกุลจริงก่อนกดส่งข้อมูลครับ")
-            elif not cleaned_target_id or len(cleaned_target_id) < 15 or cleaned_target_id.lower() == "none" or cleaned_target_id.startswith("GUEST_"):
-                st.error("⚠️ ระบบไม่สามารถลงทะเบียนได้เนื่องจากตรวจไม่พบรหัส LINE User ID ประจำตัวเครื่องของท่านครับ")
+            elif not cleaned_target_id or len(cleaned_target_id) < 15 or cleaned_target_id.lower() == "none":
+                st.error("⚠️ กรุณาระบุรหัส LINE User ID ที่ถูกต้อง (รหัสตัว U ยาว 33 หลัก)")
             else:
                 try:
                     conn = get_connection()
@@ -197,10 +172,7 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
 # หน้าที่ 1: Dashboard
 elif "Dashboard" in choice:
     if current_role == "admin":
-        if current_id and not current_id.startswith("admin"):
-            st.success(f"👑 ยินดีต้อนรับกลับเข้าสู่ระบบครับ แอดมินกล้า (Admin Level Max) | รหัส LINE User ID แท้ของคุณคือ: **{current_id}**")
-        else:
-            st.success("👑 ยินดีต้อนรับกลับเข้าสู่ระบบครับ แอดมินกล้า (Admin Level Max) | ล็อกอินผ่านความจำเครื่องเบราว์เซอร์สำเร็จเรียบร้อยครับ")
+        st.success("👑 ยินดีต้อนรับกลับเข้าสู่ระบบครับ แอดมินกล้า (Admin Level Max) | ระบบความปลอดภัยยืนยันสิทธิ์ถูกต้องเรียบร้อย")
 
     st.title("🏠 หน้าแรกและภาพรวมระบบ (Dashboard)")
     st.markdown(f"สวัสดีครับแอดมิน Status การเชื่อมต่อ **ระบบปกติดีเยี่ยม** ครับ")
@@ -239,7 +211,6 @@ elif "Dashboard" in choice:
     with col_left:
         st.write("### ⏱️ รายการจองรถล่าสุด 5 รายการ")
         if not df_recent.empty:
-            # 🚀 อัปเกรดปี 2026: เปลี่ยน use_container_width เป็น width='stretch' ตามกฎใหม่
             st.dataframe(df_recent, width='stretch', hide_index=True)
         else:
             st.info("ยังไม่มีประวัติการจองในระบบ")
@@ -251,7 +222,7 @@ elif "Dashboard" in choice:
                 "* **driver01** : ดูงานของตัวเองและกดรับงาน\n"
                 "* **driver02** : ดูงานของคนขับคนที่ 2")
 
-# หน้าที่ 2: Booker
+# --- โดเมนเมนูอื่น ๆ คงเดิมเพื่อความเสถียรของฐานข้อมูล ---
 elif "Booker" in choice:
     st.title("📋 แบบฟอร์มจองรถ (Booker)")
     st.subheader("กรอกรายละเอียดการเดินทางเพื่อส่งงานให้ผู้จัดสรรรถ")
@@ -325,7 +296,6 @@ elif "Booker" in choice:
         columns_booker = ['Voucher No.', 'ชื่อผู้โดยสาร', 'จุดรับ', 'จุดส่ง', 'เวลาเดินทาง', 'สถานะงาน']
         df_booker = pd.DataFrame(booker_jobs, columns=columns_booker)
         if not df_booker.empty:
-            # 🚀 อัปเกรดปี 2026: เปลี่ยน use_container_width เป็น width='stretch'
             st.dataframe(df_booker, width='stretch', hide_index=True)
         else:
             st.info("💡 ปัจจุบันยังไม่มีรายการงานค้างในระบบครับ")
@@ -335,7 +305,6 @@ elif "Booker" in choice:
         if 'db' in locals() and db.open:
             db.close()
 
-# หน้าที่ 3: Dispatcher
 elif "Dispatcher" in choice:
     st.title("🎛️ แผงควบคุมสำหรับ Dispatcher")
     st.write("---")
@@ -374,7 +343,6 @@ elif "Dispatcher" in choice:
             display_cols = ['id', 'Voucher No.', 'ชื่อผู้โดยสาร', 'จุดรับ', 'จุดส่ง', 'เวลาจอง', 'สถานะงาน', 'คนขับที่รับงาน']
             df_display = df_bookings[display_cols]
             st.write("### 📊 ตารางสถานะงานปัจจุบัน (กำลังรอรับ/กำลังเดินทาง)")
-            # 🚀 อัปเกรดปี 2026: เปลี่ยน use_container_width เป็น width='stretch'
             st.dataframe(df_display, width='stretch', hide_index=True, column_config={"id": None})
         else:
             st.info("✨ ไม่มีงานค้างในระบบปัจจุบัน")
@@ -448,11 +416,10 @@ elif "Dispatcher" in choice:
                     except Exception as e:
                         st.error(f"ไม่สามารถปิดงานได้: {e}")
             else:
-                st.info("ไม่มีงานที่กำลังวิ่งอยู่ (Assigned) ให้กดปิดสถานะครับ")
+                st.info("none")
         else:
             st.info("ไม่มีรายการงานในระบบ")
 
-# หน้าที่ 4: Driver
 elif "Driver" in choice:
     st.title("🚖 งานที่ได้รับมอบหมาย (Driver)")
     driver_name = "ไม่ระบุชื่อ"
@@ -489,7 +456,6 @@ elif "Driver" in choice:
     st.write("---")
     st.write("### 📥 รายการงานปัจจุบันที่ต้องปฏิบัติ")
     if not df_driver_current.empty:
-        # 🚀 อัปเกรดปี 2026: เปลี่ยน use_container_width เป็น width='stretch'
         st.dataframe(df_driver_current, width='stretch', hide_index=True)
         assigned_jobs = df_driver_current[df_driver_current['status'] == 'Assigned']
         if not assigned_jobs.empty:
@@ -525,17 +491,15 @@ elif "Driver" in choice:
                     except Exception as e: st.error(f"❌ ไม่สามารถเปลี่ยนสถานะงานได้: {e}")
                     finally:
                         if 'db' in locals() and db.open: db.close()
-    else: st.success("✨ ไม่มีงานปัจจุบันค้างอยู่")
+    else: st.success("✨ 沒有作業")
 
     st.write("---")
     st.write("### ✅ ประวัติการวิ่งงานที่เสร็จสิ้นแล้ว (Completed)")
     if not df_driver_history.empty:
         st.info(f"💡 เดือนนี้คุณวิ่งงานเสร็จสิ้นไปแล้วทั้งหมด **{len(df_driver_history)}** ใบงาน")
-        # 🚀 อัปเกรดปี 2026: เปลี่ยน use_container_width เป็น width='stretch'
         st.dataframe(df_driver_history, width='stretch', hide_index=True)
     else: st.info("ℹ️ ยังไม่มีประวัติงานที่บันทึกสถานะเสร็จสิ้น")
 
-# หน้าที่ 5: Airport Staff
 elif "Airport Staff" in choice:
     st.title("✈️ ตรวจสอบสถานะรถ (Airport Staff)")
     st.subheader("📋 ตารางมอนิเตอร์รถยนต์และคนขับที่กำลังปฏิบัติงาน")
@@ -563,7 +527,6 @@ elif "Airport Staff" in choice:
             if val == 'Accepted': return 'background-color: #d4edda; color: #155724; font-weight: bold;'
             elif val == 'Assigned': return 'background-color: #fff3cd; color: #856404;'
             return ''
-        # 🚀 อัปเกรดปี 2026: เปลี่ยน use_container_width เป็น width='stretch'
         st.dataframe(df_airport.style.map(highlight_status, subset=['สถานะงาน']), width='stretch', hide_index=True)
         st.write("---")
         col_metrics1, col_metrics2 = st.columns(2)
@@ -571,7 +534,6 @@ elif "Airport Staff" in choice:
         with col_metrics2: st.metric(label="✅ จำนวนรถที่คนขับกดรับงานแล้ว (Accepted)", value=len(df_airport[df_airport['สถานะงาน'] == 'Accepted']))
     else: st.info("ℹ️ ปัจจุบันยังไม่มีรถยนต์คันไหนกำลังเดินทางมาสนามบิน")
 
-# หน้าที่ 6: จัดการพนักงาน (Admin Only)
 elif "จัดการพนักงาน" in choice:
     st.title("👥 ระบบจัดการสิทธิ์ผู้ใช้งาน (User Management)")
     st.write("---")
@@ -584,7 +546,6 @@ elif "จัดการพนักงาน" in choice:
             guests_data = cursor.fetchall()
         if guests_data:
             df_guests = pd.DataFrame(guests_data, columns=['รหัส LINE User ID', 'ชื่อรายงานตัวพนักงาน', 'สถานะ'])
-            # 🚀 อัปเกรดปี 2026: เปลี่ยน use_container_width เป็น width='stretch'
             st.dataframe(df_guests, width='stretch', hide_index=True)
             st.sidebar.info("💡 แอดมินสามารถก๊อปปี้รหัส LINE ID จากตารางด้านบนมาวางในกล่องแก้ไขเพื่ออัปเดตตำแหน่งได้ครับ")
         else: st.success("✨ เรียบร้อยดี! ไม่มีพนักงานใหม่ค้างรออนุมัติสิทธิ์ในระบบครับ")
@@ -647,7 +608,6 @@ elif "จัดการพนักงาน" in choice:
             btn_delete = st.form_submit_button("🗑️ ลบพนักงานออกถาวร")
             
             if btn_delete:
-                # 🚀 🛠️ แก้ไขจุดมรณะหน้างาน: เปลี่ยนตัวแปรจาก confirm_ ผิดตัวให้กลายเป็น confirm_delete ตัวจริงเรียบร้อยแล้วครับ!
                 if confirm_delete and user_to_delete:
                     target_del_id = user_list_options[user_to_delete][0]
                     target_del_name = user_list_options[user_to_delete][1]
@@ -659,7 +619,7 @@ elif "จัดการพนักงาน" in choice:
                         if has_history > 0:
                             st.error(f"❌ ไม่สามารถลบคุณ {target_del_name} ได้ เนื่องจากมีประวัติการวิ่งงานในระบบแล้ว (แนะนำให้เปลี่ยนสถานะเป็น Inactive แทน เพื่อความปลอดภัยของข้อมูลบัญชี)")
                         else:
-                            cursor.execute("DELETE DELETE FROM users WHERE line_user_id = %s", (target_del_id,))
+                            cursor.execute("DELETE FROM users WHERE line_user_id = %s", (target_del_id,))
                             conn.commit()
                             st.success(f"🗑️ ลบข้อมูลพนักงานทดสอบคุณ {target_del_name} เรียบร้อยแล้ว!")
                             st.rerun()
@@ -677,7 +637,6 @@ elif "จัดการพนักงาน" in choice:
             users_data = cursor.fetchall()
         columns_users = ['รหัส LINE User ID', 'ชื่อ-นามสกุล พนักงาน', 'ตำแหน่ง (Role)', 'สถานะการใช้งาน']
         df_users = pd.DataFrame(users_data, columns=columns_users)
-        # 🚀 อัปเกรดปี 2026: เปลี่ยน use_container_width เป็น width='stretch' ตามตำราใหม่
         if not df_users.empty: st.dataframe(df_users, width='stretch', hide_index=True)
         else: st.info("ยังไม่มีข้อมูลผู้ใช้งานในระบบ")
     except Exception as e: st.error(f"❌ ไม่สามารถดึงตารางรายชื่อพนักงานได้: {e}")
