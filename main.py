@@ -66,27 +66,47 @@ st.markdown("""
     div[data-baseweb="select"], input, label { font-size: 0.9rem !important; }
     .block-container { padding-top: 3.2rem !important; padding-bottom: 1rem !important; padding-left: 0.8rem !important; padding-right: 0.8rem !important; }
     .stDataFrame table { font-size: 0.8rem !important; }
+    
+    /* ซ่อนปุ่มแดงควบคุมฝั่งขวาล่างสำหรับคนใช้งานทั่วไป */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    div[data-testid="stDecoration"] {display: none;}
+    .stAppDeployButton {display: none !important;}
+    div[data-testid="stStatusWidget"] {display: none !important;}
+    iframe[title="streamlit_runtime.auth_user_nav"] {display: none !important;}
+    div.stAppToolbar {display: none !important;}
+    button[data-testid="stViewerBadge"] {display: none !important;}
+    .viewerBadge {display: none !important;}
     </style>
     """, unsafe_allow_html=True)
 
 if "default_user_id" not in st.session_state:
     st.session_state["default_user_id"] = ""
 
-# 📌 โครงสร้างดักรหัสผ่านพารามิเตอร์ลิงก์ (แกะรหัสจากระบบดั้งเดิมและโครงสร้าง LIFF State)
+# 📌 ดักรับค่าพารามิเตอร์ลิงก์ URL
 query_params = st.query_params
 extracted_id = ""
 
+# 🔎 เริ่มต้นพ่นรายงานตัวบอกสิทธิ์ในหน้าต่าง Log สีดำเบื้องหลัง
+print("\n--- [SYSTEM LOG] ตรวจพบการคลิกเชื่อมต่อเข้าสู่ระบบคิวรถ Hunsa ---")
+print(f"DEBUG URL พารามิเตอร์ทั้งหมดที่ส่งมา: {query_params}")
+
 if "user" in query_params:
     extracted_id = query_params["user"].strip()
+    print(f"DEBUG แกะรอยจากคำสั่งปกติ (?user=): พบค่า -> {extracted_id}")
 elif "liff.state" in query_params:
-    # แกะรอยข้อความพ่วงท้ายยาวๆ จากท่อ LIFF เพื่อแยกเอารหัสตัว U ออกมา
     raw_state = query_params["liff.state"].strip()
+    print(f"DEBUG แกะรอยจากท่อระบบ LINE LIFF State: พบข้อความยาว -> {raw_state}")
     if "user=" in raw_state:
         extracted_id = raw_state.split("user=")[-1].split("&")[0].strip()
+        print(f"DEBUG แกะรอยสำเร็จแยกได้เฉพาะรหัสไอดีตัว U ออกมาคือ -> {extracted_id}")
 
-# คัดกรองความถูกต้องของไอดีตัว U ก่อนนำเข้าเซสชันระบบ
 if extracted_id and not extracted_id.startswith("http") and "line.me" not in extracted_id.lower():
     st.session_state.default_user_id = extracted_id
+    print(f"🚀 [SUCCESS LOG] ทำการล็อกรหัส LINE ID ประจำเครื่องเข้าสู่หน้าฟอร์มสำเร็จ: {extracted_id}")
+else:
+    print("⚠️ [WARNING LOG] เครื่องนี้ไม่มีการพ่วงค่ารหัส LINE ID ข้ามฝั่งมา หน้าจอจะเปิดเป็นกล่องว่างเปล่า")
 
 st.sidebar.title("🔐 เข้าสู่ระบบ")
 
@@ -131,8 +151,6 @@ choice = st.sidebar.radio(
 # หน้าพิเศษ: สำหรับพนักงานใหม่ลงทะเบียน (Guest Zone)
 if "ลงทะเบียนพนักงานใหม่" in choice:
     has_real_id = current_id and current_id.strip() != "" and not current_id.startswith("GUEST_")
-    
-    # 🚀 พ่นข้อความสีเขียวแจ้งเตือนรหัสตัว U ของจริงให้พนักงานใหม่เห็นทันทีที่แกะค่าสำเร็จ!
     if has_real_id:
         st.success(f"💚 ระบบดักจับโปรไฟล์สำเร็จ! ยินดีต้อนรับพนักงานรหัส LINE: **{current_id}** เข้าสู่ระบบคิวรถ Hunsa ครับ")
 
@@ -179,7 +197,6 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
 # หน้าที่ 1: Dashboard
 elif "Dashboard" in choice:
     if current_role == "admin":
-        # ดึงรหัสตัว U แท้ๆ ของแอดมินมาพ่นโชว์คู่กับตำแหน่งสูงสุดในกรอบเขียวทันทีเมื่อตรวจจับเจอค่า
         if current_id and not current_id.startswith("admin"):
             st.success(f"👑 ยินดีต้อนรับกลับเข้าสู่ระบบครับ แอดมินกล้า (Admin Level Max) | รหัส LINE User ID แท้ของคุณคือ: **{current_id}**")
         else:
@@ -233,7 +250,7 @@ elif "Dashboard" in choice:
                 "* **driver01** : ดูงานของตัวเองและกดรับงาน\n"
                 "* **driver02** : ดูงานของคนขับคนที่ 2")
 
-# --- โดเมนเมนูควบคุมอื่น ๆ คงเดิมตามค่ามาตรฐานความปลอดภัย ---
+# --- โดเมนเมนูควบคุมอื่น ๆ คงเดิมตามมาตรฐานฐานข้อมูล ---
 elif "Booker" in choice:
     st.title("📋 แบบฟอร์มจองรถ (Booker)")
     st.subheader("กรอกรายละเอียดการเดินทางเพื่อส่งงานให้ผู้จัดสรรรถ")
@@ -331,7 +348,7 @@ elif "Dispatcher" in choice:
                 drivers_dict[d[0]] = d[1]
                 driver_options[f"🚗 {d[1]} ({d[0][:6]}...)"] = d[0]
     except Exception as e:
-        st.error(f"ไม่สามารถดึงรายชื่อคนขับได้: {e}")
+        st.sidebar.error(f"ไม่สามารถดึงรายชื่อคนขับได้: {e}")
     finally:
         if 'db' in locals() and db.open:
             db.close()
@@ -495,7 +512,7 @@ elif "Driver" in choice:
                             cursor.execute("UPDATE bookings SET status = 'Accepted' WHERE id = %s", (job_id_to_accept,))
                             db.commit()
                             if disp_id:
-                                msg_back_to_admin = f"✅ คนขับกดรับงานแล้วครับ!\n🎫 เลข Voucher: {v_no}\n👤 ลูกค้า: {p_name}\n🚖 พนักงานขับรถ: {driver_name} ได้กดรับทราบแล้ว"
+                                msg_back_to_admin = f"✅ คนขับกดรับงานแล้วครับ!\n🎫 เลข Voucher: {v_no}\n👤 ลูกค้า: {p_name}\n𚖖 พนักงานขับรถ: {driver_name} ได้กดรับทราบแล้ว"
                                 send_line_message(msg_back_to_admin, disp_id)
                         st.success(f"🎉 คุณได้รับทราบและยอมรับใบงานเรียบร้อย!")
                         st.rerun()
@@ -541,7 +558,7 @@ elif "Airport Staff" in choice:
         st.dataframe(df_airport.style.map(highlight_status, subset=['สถานะงาน']), use_container_width=True, hide_index=True)
         st.write("---")
         col_metrics1, col_metrics2 = st.columns(2)
-        with col_metrics1: st.metric(label="🚖 จำนวนรถที่กำลังเดินทาง (Assigned)", value=len(df_airport[df_airport['สถานะงาน'] == 'Assigned']))
+        with col_metrics1: st.metric(label="𚖖 จำนวนรถที่กำลังเดินทาง (Assigned)", value=len(df_airport[df_airport['สถานะงาน'] == 'Assigned']))
         with col_metrics2: st.metric(label="✅ จำนวนรถที่คนขับกดรับงานแล้ว (Accepted)", value=len(df_airport[df_airport['สถานะงาน'] == 'Accepted']))
     else: st.info("ℹ️ ปัจจุบันยังไม่มีรถยนต์คันไหนกำลังเดินทางมาสนามบิน")
 
