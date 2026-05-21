@@ -5,7 +5,6 @@ import requests
 from datetime import datetime
 import io
 import datetime as dt_module
-import streamlit.components.v1 as components
 
 # --- 1. การตั้งค่าพื้นฐานและการเชื่อมต่อ DB ---
 def get_connection():
@@ -30,7 +29,7 @@ def send_line_message(message, target_id):
     except Exception as e:
         st.sidebar.error(f"❌ ระบบส่ง LINE ขัดข้อง: {e}")
 
-# --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน (ปรับปรุงเพื่อการทดสอบ) ---
+# --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน ---
 def check_permission(user_id, line_name=None):
     if not user_id or user_id.strip() == "" or user_id.strip().lower() == "none" or user_id.startswith("GUEST_") or "line.me" in user_id.lower():
         return "guest"
@@ -70,43 +69,24 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 📌 1. เคลียร์ความจำเครื่องเก่าทิ้งทันทีเพื่อให้แอดมินกลายเป็นพนักงานใหม่
-if "default_user_id" not in st.session_state or st.session_state["default_user_id"] == "admin01":
+if "default_user_id" not in st.session_state:
     st.session_state["default_user_id"] = ""
 
-# ดักรับค่าพารามิเตอร์แบบแกะรหัสผ่าน URL จาก LINE
+# 📌 โครงสร้างดักรหัสผ่านพารามิเตอร์ลิงก์ (แกะรหัสจากระบบดั้งเดิมและโครงสร้าง LIFF State)
 query_params = st.query_params
-if "user" in query_params:
-    raw_user = query_params["user"].strip()
-    if "line.me/R/app/" in raw_user:
-        processed_id = raw_user.split("line.me/R/app/")[-1].strip()
-    else:
-        processed_id = raw_user
-    if processed_id and not processed_id.startswith("http"):
-        st.session_state.default_user_id = processed_id
+extracted_id = ""
 
-# 🚀 2. เปิดท่อสะพานเชื่อมต่อ LIFF เพื่อดูดรหัสตัว U แท้ส่งกลับเข้ามาที่หน้าฟอร์ม
-liff_id_bridge = """
-<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-<script>
-    function initLiff() {
-        liff.init({ liffId: "2010148491-zYBksiiv" }).then(() => {
-            if (liff.isLoggedIn()) {
-                liff.getProfile().then(profile => {
-                    const params = new URLSearchParams(window.parent.location.search);
-                    if (!params.has("user") || params.get("user") !== profile.userId) {
-                        window.parent.location.href = window.parent.location.origin + window.parent.location.pathname + "?user=" + encodeURIComponent(profile.userId);
-                    }
-                });
-            } else {
-                liff.login();
-            }
-        }).catch((err) => { console.log(err); });
-    }
-    document.addEventListener("DOMContentLoaded", initLiff);
-</script>
-"""
-components.html(liff_id_bridge, height=0, width=0)
+if "user" in query_params:
+    extracted_id = query_params["user"].strip()
+elif "liff.state" in query_params:
+    # แกะรอยข้อความพ่วงท้ายยาวๆ จากท่อ LIFF เพื่อแยกเอารหัสตัว U ออกมา
+    raw_state = query_params["liff.state"].strip()
+    if "user=" in raw_state:
+        extracted_id = raw_state.split("user=")[-1].split("&")[0].strip()
+
+# คัดกรองความถูกต้องของไอดีตัว U ก่อนนำเข้าเซสชันระบบ
+if extracted_id and not extracted_id.startswith("http") and "line.me" not in extracted_id.lower():
+    st.session_state.default_user_id = extracted_id
 
 st.sidebar.title("🔐 เข้าสู่ระบบ")
 
@@ -152,7 +132,7 @@ choice = st.sidebar.radio(
 if "ลงทะเบียนพนักงานใหม่" in choice:
     has_real_id = current_id and current_id.strip() != "" and not current_id.startswith("GUEST_")
     
-    # 🚀 3. มหาเวทย์สีเขียว: เมื่อแกะค่ารหัสประจำตัวได้สำเร็จ พ่นบอกพนักงานใหม่ทันทีหน้างาน!
+    # 🚀 พ่นข้อความสีเขียวแจ้งเตือนรหัสตัว U ของจริงให้พนักงานใหม่เห็นทันทีที่แกะค่าสำเร็จ!
     if has_real_id:
         st.success(f"💚 ระบบดักจับโปรไฟล์สำเร็จ! ยินดีต้อนรับพนักงานรหัส LINE: **{current_id}** เข้าสู่ระบบคิวรถ Hunsa ครับ")
 
@@ -198,10 +178,10 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
 
 # หน้าที่ 1: Dashboard
 elif "Dashboard" in choice:
-    detected_url_id = query_params.get("user", "")
     if current_role == "admin":
-        if detected_url_id:
-            st.success(f"👑 ยินดีต้อนรับกลับเข้าสู่ระบบครับ แอดมินกล้า (Admin Level Max) | รหัส LINE User ID แท้ของคุณคือ: **{detected_url_id}**")
+        # ดึงรหัสตัว U แท้ๆ ของแอดมินมาพ่นโชว์คู่กับตำแหน่งสูงสุดในกรอบเขียวทันทีเมื่อตรวจจับเจอค่า
+        if current_id and not current_id.startswith("admin"):
+            st.success(f"👑 ยินดีต้อนรับกลับเข้าสู่ระบบครับ แอดมินกล้า (Admin Level Max) | รหัส LINE User ID แท้ของคุณคือ: **{current_id}**")
         else:
             st.success("👑 ยินดีต้อนรับกลับเข้าสู่ระบบครับ แอดมินกล้า (Admin Level Max) | ล็อกอินผ่านความจำเครื่องเบราว์เซอร์สำเร็จเรียบร้อยครับ")
 
@@ -253,7 +233,7 @@ elif "Dashboard" in choice:
                 "* **driver01** : ดูงานของตัวเองและกดรับงาน\n"
                 "* **driver02** : ดูงานของคนขับคนที่ 2")
 
-# --- เมนูควบคุมอื่น ๆ คงเดิมตามมาตรฐานฐานข้อมูล ---
+# --- โดเมนเมนูควบคุมอื่น ๆ คงเดิมตามค่ามาตรฐานความปลอดภัย ---
 elif "Booker" in choice:
     st.title("📋 แบบฟอร์มจองรถ (Booker)")
     st.subheader("กรอกรายละเอียดการเดินทางเพื่อส่งงานให้ผู้จัดสรรรถ")
