@@ -73,7 +73,7 @@ st.markdown("""
 if "default_user_id" not in st.session_state:
     st.session_state["default_user_id"] = ""
 
-# ดักรับค่าพารามิเตอร์
+# 📌 ดักรับค่าพารามิเตอร์แบบแกะรหัสผ่าน URL
 query_params = st.query_params
 if "user" in query_params:
     raw_user = query_params["user"].strip()
@@ -84,7 +84,7 @@ if "user" in query_params:
     if processed_id and not processed_id.startswith("http"):
         st.session_state.default_user_id = processed_id
 
-# ท่อสะพานเชื่อมต่อดักจับไอดีอัตโนมัติ
+# 🚀 ท่อสะพานเชื่อมต่อขอดึงสิทธิ์รหัสตัว U แท้จากระบบแอป LINE ส่งข้ามมาบราวเซอร์
 liff_id_bridge = """
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
@@ -195,9 +195,13 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
 
 # หน้าที่ 1: Dashboard
 elif "Dashboard" in choice:
-    # 🚀 จุดอัปเกรดสำคัญ: ตรวจเช็คว่าถ้าสิทธิ์ในระบบเป็น admin พ่นข้อความต้อนรับสีเขียวขึ้นมาให้ทันทีครับ!
+    # 🚀 [จุดอัปเกรดไม้ตายตัวจบ] ดึงรหัสตัว U แท้ๆ จากตัวแปรพารามิเตอร์ URL ลิงก์ที่ส่งมาจากไลน์แอดมินมาแสดงในกรอบเขียวทันที!
+    detected_url_id = query_params.get("user", "")
     if current_role == "admin":
-        st.success("👑 ยินดีต้อนรับกลับเข้าสู่ระบบครับ แอดมินกล้า (Admin Level Max) ระบบความปลอดภัยระบุตัวตนถูกต้องเรียบร้อยครับ")
+        if detected_url_id:
+            st.success(f"👑 ยินดีต้อนรับกลับเข้าสู่ระบบครับ แอดมินกล้า (Admin Level Max) | รหัส LINE User ID แท้ของคุณคือ: **{detected_url_id}**")
+        else:
+            st.success("👑 ยินดีต้อนรับกลับเข้าสู่ระบบครับ แอดมินกล้า (Admin Level Max) | ล็อกอินผ่านความจำเครื่องเบราว์เซอร์สำเร็จเรียบร้อยครับ")
 
     st.title("🏠 หน้าแรกและภาพรวมระบบ (Dashboard)")
     st.markdown(f"สวัสดีครับแอดมิน Status การเชื่อมต่อ **ระบบปกติดีเยี่ยม** ครับ")
@@ -247,7 +251,7 @@ elif "Dashboard" in choice:
                 "* **driver01** : ดูงานของตัวเองและกดรับงาน\n"
                 "* **driver02** : ดูงานของคนขับคนที่ 2")
 
-# หน้าที่ 2: Booker (ส่วนอื่น ๆ ของระบบคงไว้ตามเดิมเพื่อเสถียรภาพ)
+# --- โค้ดส่วนเมนูอื่นคงเดิมเพื่อความปลอดภัยของฐานข้อมูล ---
 elif "Booker" in choice:
     st.title("📋 แบบฟอร์มจองรถ (Booker)")
     st.subheader("กรอกรายละเอียดการเดินทางเพื่อส่งงานให้ผู้จัดสรรรถ")
@@ -330,7 +334,6 @@ elif "Booker" in choice:
         if 'db' in locals() and db.open:
             db.close()
 
-# หน้าที่ 3: Dispatcher
 elif "Dispatcher" in choice:
     st.title("🎛️ แผงควบคุมสำหรับ Dispatcher")
     st.write("---")
@@ -446,7 +449,6 @@ elif "Dispatcher" in choice:
         else:
             st.info("ไม่มีรายการงานในระบบ")
 
-# หน้าที่ 4: Driver
 elif "Driver" in choice:
     st.title("🚖 งานที่ได้รับมอบหมาย (Driver)")
     driver_name = "ไม่ระบุชื่อ"
@@ -527,7 +529,6 @@ elif "Driver" in choice:
         st.dataframe(df_driver_history, use_container_width=True, hide_index=True)
     else: st.info("ℹ️ ยังไม่มีประวัติงานที่บันทึกสถานะเสร็จสิ้น")
 
-# หน้าที่ 5: Airport Staff
 elif "Airport Staff" in choice:
     st.title("✈️ ตรวจสอบสถานะรถ (Airport Staff)")
     st.subheader("📋 ตารางมอนิเตอร์รถยนต์และคนขับที่กำลังปฏิบัติงาน")
@@ -562,7 +563,6 @@ elif "Airport Staff" in choice:
         with col_metrics2: st.metric(label="✅ จำนวนรถที่คนขับกดรับงานแล้ว (Accepted)", value=len(df_airport[df_airport['สถานะงาน'] == 'Accepted']))
     else: st.info("ℹ️ ปัจจุบันยังไม่มีรถยนต์คันไหนกำลังเดินทางมาสนามบิน")
 
-# หน้าที่ 6: จัดการพนักงาน (Admin Only)
 elif "จัดการพนักงาน" in choice:
     st.title("👥 ระบบจัดการสิทธิ์ผู้ใช้งาน (User Management)")
     st.write("---")
@@ -633,4 +633,41 @@ elif "จัดการพนักงาน" in choice:
         with st.form("user_delete_form"):
             st.write("❌ **โซนอันตราย: ลบพนักงานออกจากระบบ**")
             user_to_delete = st.selectbox("เลือกรายชื่อที่จะลบทิ้งเด็ดขาด", options=list(user_list_options.keys()))
-            confirm_
+            confirm_delete = st.checkbox("⚠️ ยืนยันว่าต้องการลบข้อมูลพนักงานคนนี้จริง ๆ")
+            btn_delete = st.form_submit_button("🗑️ ลบพนักงานออกถาวร")
+            
+            if btn_delete:
+                if confirm_delete and user_to_delete:
+                    target_del_id = user_list_options[user_to_delete][0]
+                    target_del_name = user_list_options[user_to_delete][1]
+                    try:
+                        conn = get_connection()
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT COUNT(*) FROM bookings WHERE driver_id = %s", (target_del_id,))
+                        has_history = cursor.fetchone()[0]
+                        if has_history > 0:
+                            st.error(f"❌ ไม่สามารถลบคุณ {target_del_name} ได้ เนื่องจากมีประวัติการวิ่งงานในระบบแล้ว (แนะนำให้เปลี่ยนสถานะเป็น Inactive แทน เพื่อความปลอดภัยของข้อมูลบัญชี)")
+                        else:
+                            cursor.execute("DELETE FROM users WHERE line_user_id = %s", (target_del_id,))
+                            conn.commit()
+                            st.success(f"🗑️ ลบข้อมูลพนักงานทดสอบคุณ {target_del_name} เรียบร้อยแล้ว!")
+                            st.rerun()
+                        cursor.close()
+                        conn.close()
+                    except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
+                else: st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
+
+    st.write("---")
+    st.write("### 📋 รายชื่อพนักงานและระดับสิทธิ์ปัจจุบันในคลาวด์")
+    try:
+        db = get_connection()
+        with db.cursor() as cursor:
+            cursor.execute("SELECT line_user_id, name, role, status FROM users ORDER BY role ASC")
+            users_data = cursor.fetchall()
+        columns_users = ['รหัส LINE User ID', 'ชื่อ-นามสกุล พนักงาน', 'ตำแหน่ง (Role)', 'สถานะการใช้งาน']
+        df_users = pd.DataFrame(users_data, columns=columns_users)
+        if not df_users.empty: st.dataframe(df_users, use_container_width=True, hide_index=True)
+        else: st.info("ยังไม่มีข้อมูลผู้ใช้งานในระบบ")
+    except Exception as e: st.error(f"❌ ไม่สามารถดึงตารางรายชื่อพนักงานได้: {e}")
+    finally:
+        if 'db' in locals() and db.open: db.close()
