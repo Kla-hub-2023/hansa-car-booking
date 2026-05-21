@@ -73,7 +73,7 @@ st.markdown("""
 if "default_user_id" not in st.session_state:
     st.session_state["default_user_id"] = ""
 
-# 📌 ดักรับค่าพารามิเตอร์แบบดั้งเดิม (ถ้ามีส่งมา)
+# ดักรับค่าพารามิเตอร์
 query_params = st.query_params
 if "user" in query_params:
     raw_user = query_params["user"].strip()
@@ -84,7 +84,7 @@ if "user" in query_params:
     if processed_id and not processed_id.startswith("http"):
         st.session_state.default_user_id = processed_id
 
-# 🚀 [ทีเด็ดแก้ทาง iOS] ฝังโค้ดขอสิทธิ์ดึงเฉพาะรหัสตัว U (userId) ผ่านระบบ LINE LIFF ลิงก์ตรงแบบไม่โดนบล็อก iframe
+# ท่อสะพานเชื่อมต่อดักจับไอดีอัตโนมัติ
 liff_id_bridge = """
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
@@ -94,7 +94,6 @@ liff_id_bridge = """
                 liff.getProfile().then(profile => {
                     const params = new URLSearchParams(window.parent.location.search);
                     if (!params.has("user") || params.get("user") !== profile.userId) {
-                        // ดีดดักจับค่ารหัสตัว U ส่งกลับเข้าสู่ระบบหลักทันที
                         window.parent.location.href = window.parent.location.origin + window.parent.location.pathname + "?user=" + encodeURIComponent(profile.userId);
                     }
                 });
@@ -106,7 +105,6 @@ liff_id_bridge = """
     document.addEventListener("DOMContentLoaded", initLiff);
 </script>
 """
-# รันระบบดักจับความปลอดภัยเงียบ ๆ หลังบ้าน
 components.html(liff_id_bridge, height=0, width=0)
 
 st.sidebar.title("🔐 เข้าสู่ระบบ")
@@ -151,7 +149,6 @@ choice = st.sidebar.radio(
 
 # หน้าพิเศษ: สำหรับพนักงานใหม่ลงทะเบียน (Guest Zone)
 if "ลงทะเบียนพนักงานใหม่" in choice:
-    # แสดงกล่องข้อความความสำเร็จทันทีหากตรวจจับรหัสตัว U ได้สำเร็จ
     has_real_id = current_id and current_id.strip() != "" and not current_id.startswith("GUEST_")
     if has_real_id:
         st.success(f"💚 ระบบดักจับโปรไฟล์สำเร็จ! ยินดีต้อนรับพนักงานรหัส LINE: **{current_id}** เข้าสู่ระบบคิวรถ Hunsa ครับ")
@@ -198,6 +195,10 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
 
 # หน้าที่ 1: Dashboard
 elif "Dashboard" in choice:
+    # 🚀 จุดอัปเกรดสำคัญ: ตรวจเช็คว่าถ้าสิทธิ์ในระบบเป็น admin พ่นข้อความต้อนรับสีเขียวขึ้นมาให้ทันทีครับ!
+    if current_role == "admin":
+        st.success("👑 ยินดีต้อนรับกลับเข้าสู่ระบบครับ แอดมินกล้า (Admin Level Max) ระบบความปลอดภัยระบุตัวตนถูกต้องเรียบร้อยครับ")
+
     st.title("🏠 หน้าแรกและภาพรวมระบบ (Dashboard)")
     st.markdown(f"สวัสดีครับแอดมิน Status การเชื่อมต่อ **ระบบปกติดีเยี่ยม** ครับ")
     st.write("---")
@@ -246,7 +247,7 @@ elif "Dashboard" in choice:
                 "* **driver01** : ดูงานของตัวเองและกดรับงาน\n"
                 "* **driver02** : ดูงานของคนขับคนที่ 2")
 
-# หน้าที่ 2: Booker
+# หน้าที่ 2: Booker (ส่วนอื่น ๆ ของระบบคงไว้ตามเดิมเพื่อเสถียรภาพ)
 elif "Booker" in choice:
     st.title("📋 แบบฟอร์มจองรถ (Booker)")
     st.subheader("กรอกรายละเอียดการเดินทางเพื่อส่งงานให้ผู้จัดสรรรถ")
@@ -632,41 +633,4 @@ elif "จัดการพนักงาน" in choice:
         with st.form("user_delete_form"):
             st.write("❌ **โซนอันตราย: ลบพนักงานออกจากระบบ**")
             user_to_delete = st.selectbox("เลือกรายชื่อที่จะลบทิ้งเด็ดขาด", options=list(user_list_options.keys()))
-            confirm_delete = st.checkbox("⚠️ ยืนยันว่าต้องการลบข้อมูลพนักงานคนนี้จริง ๆ")
-            btn_delete = st.form_submit_button("🗑️ ลบพนักงานออกถาวร")
-            
-            if btn_delete:
-                if confirm_delete and user_to_delete:
-                    target_del_id = user_list_options[user_to_delete][0]
-                    target_del_name = user_list_options[user_to_delete][1]
-                    try:
-                        conn = get_connection()
-                        cursor = conn.cursor()
-                        cursor.execute("SELECT COUNT(*) FROM bookings WHERE driver_id = %s", (target_del_id,))
-                        has_history = cursor.fetchone()[0]
-                        if has_history > 0:
-                            st.error(f"❌ ไม่สามารถลบคุณ {target_del_name} ได้ เนื่องจากมีประวัติการวิ่งงานในระบบแล้ว (แนะนำให้เปลี่ยนสถานะเป็น Inactive แทน เพื่อความปลอดภัยของข้อมูลบัญชี)")
-                        else:
-                            cursor.execute("DELETE FROM users WHERE line_user_id = %s", (target_del_id,))
-                            conn.commit()
-                            st.success(f"🗑️ ลบข้อมูลพนักงานทดสอบคุณ {target_del_name} เรียบร้อยแล้ว!")
-                            st.rerun()
-                        cursor.close()
-                        conn.close()
-                    except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
-                else: st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
-
-    st.write("---")
-    st.write("### 📋 รายชื่อพนักงานและระดับสิทธิ์ปัจจุบันในคลาวด์")
-    try:
-        db = get_connection()
-        with db.cursor() as cursor:
-            cursor.execute("SELECT line_user_id, name, role, status FROM users ORDER BY role ASC")
-            users_data = cursor.fetchall()
-        columns_users = ['รหัส LINE User ID', 'ชื่อ-นามสกุล พนักงาน', 'ตำแหน่ง (Role)', 'สถานะการใช้งาน']
-        df_users = pd.DataFrame(users_data, columns=columns_users)
-        if not df_users.empty: st.dataframe(df_users, use_container_width=True, hide_index=True)
-        else: st.info("ยังไม่มีข้อมูลผู้ใช้งานในระบบ")
-    except Exception as e: st.error(f"❌ ไม่สามารถดึงตารางรายชื่อพนักงานได้: {e}")
-    finally:
-        if 'db' in locals() and db.open: db.close()
+            confirm_
