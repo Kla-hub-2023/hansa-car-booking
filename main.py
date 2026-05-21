@@ -67,7 +67,7 @@ st.markdown("""
     .block-container { padding-top: 3.2rem !important; padding-bottom: 1rem !important; padding-left: 0.8rem !important; padding-right: 0.8rem !important; }
     .stDataFrame table { font-size: 0.8rem !important; }
     
-    /* ซ่อนปุ่มและแถบสีแดงควบคุมของระบบหลังบ้านเพื่อความเนี๊ยบ */
+    /* ซ่อนปุ่มควบคุมเซิร์ฟเวอร์หลังบ้านเพื่อความคลีนสวยงาม */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
@@ -84,7 +84,7 @@ st.markdown("""
 if "default_user_id" not in st.session_state:
     st.session_state["default_user_id"] = ""
 
-# ดักรับค่าพารามิเตอร์ลิงก์ URL (กรณีเปิดผ่านระบบเบราว์เซอร์ปกติที่รองรับ)
+# ดักรับค่าพารามิเตอร์ลิงก์ URL
 query_params = st.query_params
 if "user" in query_params:
     st.session_state.default_user_id = query_params["user"].strip()
@@ -133,16 +133,25 @@ choice = st.sidebar.radio(
 if "ลงทะเบียนพนักงานใหม่" in choice:
     has_real_id = current_id and current_id.strip() != "" and not current_id.startswith("admin")
     if has_real_id:
-        st.success(f"💚 ตรวจพบรหัสสำหรับการลงทะเบียน: **{current_id}** พร้อมบันทึกเข้าสู่ฐานข้อมูลคิวรถ Hunsa ครับ")
+        st.success(f"💚 ระบบดักจับรหัส ID ประจำเครื่องสำเร็จ: **{current_id}** พร้อมบันทึกข้อมูลแล้วครับ")
 
     st.title("📝 ฟอร์มรายงานตัวและลงทะเบียนพนักงานใหม่")
     st.warning("⚠️ บัญชีของคุณกำลังรอแอดมินอนุมัติสิทธิ์เข้าใช้งานระบบคิวรถครับ")
     st.write("---")
+    
+    # 🚀 [ไม้ตายแก้เกมสากล] สร้างกล่องวิเศษให้พนักงานกดเปิดลิงก์ส่องคัดลอกรหัสตัว U ของตัวเองได้ใน 1 วินาที!
+    st.markdown("### 🔍 วิธีการคัดลอกรหัส LINE User ID สำหรับพนักงานใหม่")
+    st.info("สำหรับโทรศัพท์มือถือ iPhone หรือเครื่องที่ไม่ขึ้นไอดีออโต้ ให้แอดมินส่งลิงก์ 'เว็บตรวจไอดีด่วน' ด้านล่างนี้ให้พนักงานกดเข้าไปคัดลอกรหัสตัว U ของตัวเองมาวางสมัครได้เลยครับ 👇")
+    st.markdown("""
+        <a href="https://kla-hub-2023.github.io/line-id-checker/" target="_blank" style="display:inline-block; background-color:#28a745; color:white; padding:10px 20px; text-decoration:none; font-weight:bold; border-radius:5px; margin-bottom:15px;">🌐 กดเปิดเว็บคัดลอกรหัส LINE ID ประจำเครื่อง</a>
+    """, unsafe_allow_html=True)
+    st.write("---")
+    
     st.write("### 👤 กรุณากรอกข้อมูลรายงานตัวเพื่อส่งให้แอดมินอนุมัติ")
     
     with st.form("guest_register_form", clear_on_submit=True):
         reg_name = st.text_input("1. ระบุ ชื่อ - นามสกุลจริงของคุณ", placeholder="เช่น นายสมชาย ใจดีมาก").strip()
-        reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (รหัสตัว U 33 หลักที่คัดลอกมาจากห้องแชท)", value=current_id if current_id else "", placeholder="วางรหัสประจำตัว LINE ของท่านที่นี่")
+        reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (รหัสตัว U 33 หลัก)", value=current_id if current_id else "", placeholder="คัดลอกรหัสตัว U จากเว็บด้านบนมาวางที่นี่")
             
         submit_reg = st.form_submit_button("🚀 ส่งข้อมูลลงทะเบียนระบบคิวรถ")
         
@@ -222,7 +231,7 @@ elif "Dashboard" in choice:
                 "* **driver01** : ดูงานของตัวเองและกดรับงาน\n"
                 "* **driver02** : ดูงานของคนขับคนที่ 2")
 
-# --- โดเมนเมนูอื่น ๆ คงเดิมเพื่อความเสถียรของฐานข้อมูล ---
+# --- โครงสร้างฟังก์ชัน Booker, Dispatcher, Driver, AirportStaff และ จัดการพนักงาน คงไว้ตามมาตรฐานเดิมทั้งหมดเพื่อความปลอดภัย ---
 elif "Booker" in choice:
     st.title("📋 แบบฟอร์มจองรถ (Booker)")
     st.subheader("กรอกรายละเอียดการเดินทางเพื่อส่งงานให้ผู้จัดสรรรถ")
@@ -416,7 +425,7 @@ elif "Dispatcher" in choice:
                     except Exception as e:
                         st.error(f"ไม่สามารถปิดงานได้: {e}")
             else:
-                st.info("none")
+                st.info("ไม่มีงานที่กำลังวิ่งอยู่ (Assigned) ให้กดปิดสถานะครับ")
         else:
             st.info("ไม่มีรายการงานในระบบ")
 
@@ -491,7 +500,7 @@ elif "Driver" in choice:
                     except Exception as e: st.error(f"❌ ไม่สามารถเปลี่ยนสถานะงานได้: {e}")
                     finally:
                         if 'db' in locals() and db.open: db.close()
-    else: st.success("✨ 沒有作業")
+    else: st.success("✨ ไม่มีงานปัจจุบันค้างอยู่")
 
     st.write("---")
     st.write("### ✅ ประวัติการวิ่งงานที่เสร็จสิ้นแล้ว (Completed)")
