@@ -5,6 +5,7 @@ import requests
 from datetime import datetime
 import io
 import datetime as dt_module
+import streamlit.components.v1 as components
 
 # --- 1. การตั้งค่าพื้นฐานและการเชื่อมต่อ DB ---
 def get_connection():
@@ -72,7 +73,7 @@ st.markdown("""
 if "default_user_id" not in st.session_state:
     st.session_state["default_user_id"] = ""
 
-# โครงสร้างดักค่า URL แกะรหัสตัว U จาก LINE OA
+# 📌 ดักรับค่าพารามิเตอร์แบบดั้งเดิม (ถ้ามีส่งมา)
 query_params = st.query_params
 if "user" in query_params:
     raw_user = query_params["user"].strip()
@@ -80,9 +81,33 @@ if "user" in query_params:
         processed_id = raw_user.split("line.me/R/app/")[-1].strip()
     else:
         processed_id = raw_user
-    
     if processed_id and not processed_id.startswith("http"):
         st.session_state.default_user_id = processed_id
+
+# 🚀 [ทีเด็ดแก้ทาง iOS] ฝังโค้ดขอสิทธิ์ดึงเฉพาะรหัสตัว U (userId) ผ่านระบบ LINE LIFF ลิงก์ตรงแบบไม่โดนบล็อก iframe
+liff_id_bridge = """
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+    function initLiff() {
+        liff.init({ liffId: "2010148491-zYBksiiv" }).then(() => {
+            if (liff.isLoggedIn()) {
+                liff.getProfile().then(profile => {
+                    const params = new URLSearchParams(window.parent.location.search);
+                    if (!params.has("user") || params.get("user") !== profile.userId) {
+                        // ดีดดักจับค่ารหัสตัว U ส่งกลับเข้าสู่ระบบหลักทันที
+                        window.parent.location.href = window.parent.location.origin + window.parent.location.pathname + "?user=" + encodeURIComponent(profile.userId);
+                    }
+                });
+            } else {
+                liff.login();
+            }
+        }).catch((err) => { console.log(err); });
+    }
+    document.addEventListener("DOMContentLoaded", initLiff);
+</script>
+"""
+# รันระบบดักจับความปลอดภัยเงียบ ๆ หลังบ้าน
+components.html(liff_id_bridge, height=0, width=0)
 
 st.sidebar.title("🔐 เข้าสู่ระบบ")
 
@@ -126,7 +151,7 @@ choice = st.sidebar.radio(
 
 # หน้าพิเศษ: สำหรับพนักงานใหม่ลงทะเบียน (Guest Zone)
 if "ลงทะเบียนพนักงานใหม่" in choice:
-    # 🚀 จุดอัปเกรดสำคัญ: ตรวจเช็คว่าแกะรหัสตัว U สำเร็จใช่ไหม ถ้าใช่ พ่นกล่อง Message สีเขียวแจ้งเตือนต้อนรับทันทีด้านบนสุด!
+    # แสดงกล่องข้อความความสำเร็จทันทีหากตรวจจับรหัสตัว U ได้สำเร็จ
     has_real_id = current_id and current_id.strip() != "" and not current_id.startswith("GUEST_")
     if has_real_id:
         st.success(f"💚 ระบบดักจับโปรไฟล์สำเร็จ! ยินดีต้อนรับพนักงานรหัส LINE: **{current_id}** เข้าสู่ระบบคิวรถ Hunsa ครับ")
