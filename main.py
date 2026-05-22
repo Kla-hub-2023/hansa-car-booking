@@ -44,9 +44,7 @@ def check_permission(user_id, line_name=None):
         return "dispatcher"
     elif uid_clean == "driver01":
         return "driver"
-    elif uid_clean == "airportstaff01":
-        return "airportstaff"
-    elif uid_clean == "staff01":
+    elif uid_clean in ["airportstaff01", "staff01"]:
         return "airportstaff"
         
     try:
@@ -98,6 +96,7 @@ if "default_user_id" not in st.session_state:
 query_params = st.query_params
 extracted_id = ""
 
+# ระบบดักรับค่าพารามิเตอร์อัจฉริยะคู่ขนาน
 if "lineidtoemp" in query_params:
     raw_val = query_params["lineidtoemp"].strip()
     if "*" not in raw_val and len(raw_val) > 15:
@@ -136,31 +135,29 @@ elif current_role == "booker":
 elif current_role == "dispatcher":
     menu_options = ["🖥️ Dispatcher"]
 elif current_role == "driver":
-    menu_options = ["𚖖 งานของฉัน (Driver)"]
+    menu_options = ["🚖 งานของฉัน (Driver)"]
 elif current_role in ["airportstaff", "airport staff"]:
     menu_options = ["✈️ Airport Staff"]
 else:
     menu_options = ["📝 ลงทะเบียนพนักงานใหม่"]
 
-# 📌 🧠 [จุดปรับปรุงเชิงรุก 🎯] ล้างค่าเมนูเอ๋อค้างเก่า และล็อกเมนูปปลายทางตามใจแอดมินกล้าทันที
 if "current_menu_choice" not in st.session_state or st.session_state["current_menu_choice"] not in menu_options:
     st.session_state["current_menu_choice"] = menu_options[0] if menu_options else ""
 
-# 🚀 ทริคเปลี่ยนหน้าวาร์ปออโต้เมื่อแอดมินกล้ากดผ่านริชเมนูตัวอักษรลับข้ามสิทธิ์มา
-if current_role == "admin" and "menu_forced" not in st.session_state:
-    if "lineidtoemp" in query_params:
-        # กรณีแอดมินจำลองสแกนรหัสลิฟต์ ให้แช่ไว้หน้าฟอร์ม
-        st.session_state["current_menu_choice"] = "📝 ลงทะเบียนพนักงานใหม่"
-    elif "user" in query_params:
+# 📌 🧠 [ระบบรู้ใจแอดมินกล้า] วาร์ปออโต้สลับหน้าตามปุ่มริชเมนูที่แอดมินกดเปิดเข้าเว็บมา
+if current_role == "admin" and "menu_initialized" not in st.session_state:
+    if "user" in query_params:
         val_user = query_params["user"].strip().lower()
-        if val_user == "admin01" and "id" in query_params: # ถ้าเป็นลิงก์ช่อง F เก่าที่แอดมินเคยแนบ
-            st.session_state["current_menu_choice"] = "👥 จัดการพนักงาน"
-        elif val_user == "driver01":
-            st.session_state["current_menu_choice"] = "𚖖 งานของฉัน (Driver)"
+        if val_user == "driver01":
+            st.session_state["current_menu_choice"] = "🚖 งานของฉัน (Driver)"
         elif val_user in ["staff01", "airportstaff01"]:
             st.session_state["current_menu_choice"] = "✈️ Airport Staff"
         elif val_user == "admin01":
             st.session_state["current_menu_choice"] = "🏠 Dashboard"
+    elif "lineidtoemp" in query_params or "liff.state" in query_params:
+        # 🎯 ดักจับ: ถ้าแอดมินใช้ไลน์ตัวเองกดปุ่ม F (Register) ระบบจะเปลี่ยนหน้าเปิดเมนูกำหนดสิทธิ์ผู้ใช้งานให้ทันที!
+        st.session_state["current_menu_choice"] = "👥 จัดการพนักงาน"
+    st.session_state["menu_initialized"] = True
 
 choice = st.sidebar.radio(
     "เมนูใช้งาน", 
@@ -596,7 +593,7 @@ elif choice == "🚖 งานของฉัน (Driver)":
                     except Exception as e: st.error(f"❌ ไม่สามารถเปลี่ยนสถานะงานได้: {e}")
                     finally:
                         if 'db' in locals() and db.open: db.close()
-    else: st.success("✨ 沒有งานปัจจุบันค้างอยู่")
+    else: st.success("✨ ไม่มีงานปัจจุบันค้างอยู่")
 
     st.write("---")
     st.write("### ✅ ประวัติการวิ่งงานที่เสร็จสิ้นแล้ว (Completed)")
@@ -736,7 +733,7 @@ elif choice == "👥 จัดการพนักงาน":
                 else: st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
 
     st.write("---")
-    st.write("### 📋 รายชื่อพนักงานและระดับสิทธิ์ปัจจุบันในคลาวด์")
+    st.write("### 📋 รายชื่อพนักงานและระดับสิทธิ์ปัจจุบัน in คลาวด์")
     try:
         db = get_connection()
         with db.cursor() as cursor:
