@@ -30,13 +30,22 @@ def send_line_message(message, target_id):
     except Exception as e:
         st.sidebar.error(f"❌ ระบบส่ง LINE ขัดข้อง: {e}")
 
-# --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน ---
+# --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน (เวอร์ชันเปิดสิทธิ์ทางลัดริชเมนู) ---
 def check_permission(user_id, line_name=None):
     if not user_id or user_id.strip() == "" or user_id.strip().lower() == "none" or user_id.startswith("GUEST_") or "line.me" in user_id.lower() or "http" in user_id.lower() or "*" in user_id:
         return "guest"
         
+    # ระบบ Bypass สิทธิ์พิเศษสำหรับปุ่มทดสอบระบบทางลัดของแอดมิน
     if user_id == "admin01":
         return "admin"
+    elif user_id == "booker01":
+        return "booker"
+    elif user_id == "dispatcher01":
+        return "dispatcher"
+    elif user_id == "driver01":
+        return "driver"
+    elif user_id == "airportstaff01":
+        return "airportstaff"
         
     try:
         db = get_connection()
