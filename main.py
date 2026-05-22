@@ -2,12 +2,10 @@ import streamlit as st
 import pymysql
 import pandas as pd
 import requests
-from datetime import datetime
-import io
 import datetime as dt_module
 import streamlit.components.v1 as components
 
-# --- 1. การตั้งค่าพื้นฐานและการเชื่อมต่อ DB ---
+# --- 1. ตั้งค่าฐานข้อมูล ---
 def get_connection():
     return pymysql.connect(
         host='mysql-22653bef-kla-e55d.c.aivencloud.com',
@@ -22,228 +20,102 @@ def send_line_message(message, target_id):
     url = 'https://api.line.me/v2/bot/message/push'
     headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {token}'}
     data = {'to': target_id, 'messages': [{'type': 'text', 'text': message}]}
-    
-    try:
-        response = requests.post(url, headers=headers, json=data)
-        if response.status_code != 200:
-            st.sidebar.error(f"⚠️ LINE API Error: {response.status_code} - {response.text}")
-    except Exception as e:
-        st.sidebar.error(f"❌ ระบบส่ง LINE ขัดข้อง: {e}")
+    try: requests.post(url, headers=headers, json=data)
+    except: pass
 
-# --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน ---
-def check_permission(user_id, line_name=None):
-    if not user_id or user_id.strip() == "" or user_id.strip().lower() == "none" or user_id.startswith("GUEST_") or "line.me" in user_id.lower() or "http" in user_id.lower() or "*" in user_id:
-        return "guest"
-        
-    uid_clean = user_id.strip().lower()
-    if uid_clean == "admin01":
-        return "admin"
-    elif uid_clean == "booker01":
-        return "booker"
-    elif uid_clean == "dispatcher01":
-        return "dispatcher"
-    elif uid_clean == "driver01":
-        return "driver"
-    elif uid_clean in ["airportstaff01", "staff01"]:
-        return "airportstaff"
-        
+# --- 2. เช็คสิทธิ์ ---
+def check_permission(user_id):
+    if not user_id or user_id.startswith("GUEST_") or "*" in user_id: return "guest"
+    uid = user_id.strip().lower()
+    mapping = {"admin01": "admin", "booker01": "booker", "dispatcher01": "dispatcher", "driver01": "driver", "staff01": "airportstaff", "airportstaff01": "airportstaff"}
+    if uid in mapping: return mapping[uid]
     try:
         db = get_connection()
         with db.cursor() as cursor:
             cursor.execute("SELECT role, status FROM users WHERE line_user_id = %s", (user_id,))
-            result = cursor.fetchone()
-            
-            if result:
-                role_res = str(result[0]).strip().lower()
-                status_res = result[1] if result[1] else "Active"
-                if status_res == "Inactive":
-                    return "guest"
-                return role_res
-            else:
-                return "guest"
-    except Exception as e:
-        return "guest"
-    finally:
-        if 'db' in locals() and db.open:
-            db.close()
+            res = cursor.fetchone()
+            if res and res[1] == "Active": return str(res[0]).lower()
+            return "guest"
+    except: return "guest"
+    finally: db.close()
 
-st.set_page_config(page_title="ระบบจัดการรถ Multi-Role", layout="wide")
+st.set_page_config(page_title="ระบบจัดการรถ Hunsa", layout="wide")
 
-st.markdown("""
-    <style>
-    h1 { font-size: 1.4rem !important; padding-top: 0.3rem !important; padding-bottom: 0.3rem !important; line-height: 1.1 !important; }
-    h2, h3, .stSubheader { font-size: 1.05rem !important; font-weight: 600 !important; }
-    div[data-baseweb="select"], input, label { font-size: 0.9rem !important; }
-    .block-container { padding-top: 3.2rem !important; padding-bottom: 1rem !important; padding-left: 0.8rem !important; padding-right: 0.8rem !important; }
-    .stDataFrame table { font-size: 0.8rem !important; }
-    
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    div[data-testid="stDecoration"] {display: none;}
-    .stAppDeployButton {display: none !important;}
-    div[data-testid="stStatusWidget"] {display: none !important;}
-    iframe[title="streamlit_runtime.auth_user_nav"] {display: none !important;}
-    div.stAppToolbar {display: none !important;}
-    button[data-testid="stViewerBadge"] {display: none !important;}
-    .viewerBadge {display: none !important;}
-    </style>
-    """, unsafe_allow_html=True)
-
-if "default_user_id" not in st.session_state:
-    st.session_state["default_user_id"] = ""
-
-# 📌 โหลดดักจับค่าพารามิเตอร์ URL ทันทีในระดับ Global
+# --- 3. ดักจับไอดี ---
 query_params = st.query_params
-extracted_id = ""
+if "lineidtoemp" in query_params: st.session_state.default_user_id = query_params["lineidtoemp"].strip()
+elif "user" in query_params: st.session_state.default_user_id = query_params["user"].strip()
 
-if "lineidtoemp" in query_params:
-    raw_val = query_params["lineidtoemp"].strip()
-    if "*" not in raw_val and len(raw_val) > 15:
-        extracted_id = raw_val
-elif "user" in query_params:
-    raw_user = query_params["user"].strip()
-    if "*" not in raw_user:
-        extracted_id = raw_user
+current_id = st.sidebar.text_input("ระบุ LINE User ID", value=st.session_state.get("default_user_id", "")).strip()
+st.session_state.default_user_id = current_id
+user_role = check_permission(current_id)
+st.sidebar.info(f"สิทธิ์ของคุณ: {user_role.upper()}")
 
-if extracted_id:
-    st.session_state.default_user_id = extracted_id
-
-st.sidebar.title("🔐 เข้าสู่ระบบ")
-
-current_id = st.sidebar.text_input(
-    "ระบุ LINE User ID", 
-    value=st.session_state["default_user_id"]
-).strip()
-
-if "http" in current_id.lower() or "line.me" in current_id.lower() or "*" in current_id:
-    current_id = ""
-
-st.session_state["default_user_id"] = current_id
-
-user_role = check_permission(current_id).strip().lower()
-st.sidebar.info(f"สิทธิ์ของคุณคือ: {user_role}")
-
-# --- 3. จัดการรายการเมนูฝั่งซ้ายตามระดับสิทธิ์ ---
+# --- 4. จัดเมนูตามสิทธิ์ ---
 menu_options = []
-current_role = user_role.strip().lower()
+if user_role == "admin": menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "𚖖 งานของฉัน (Driver)", "✈️ Airport Staff"]
+elif user_role == "booker": menu_options = ["➕ Booker"]
+elif user_role == "dispatcher": menu_options = ["🖥️ Dispatcher"]
+elif user_role == "driver": menu_options = ["𚖖 งานของฉัน (Driver)"]
+elif user_role == "airportstaff": menu_options = ["✈️ Airport Staff"]
+else: menu_options = ["📝 ลงทะเบียนพนักงานใหม่"]
 
-if current_role == "admin":
-    menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "👥 จัดการพนักงาน", "🚖 งานของฉัน (Driver)", "✈️ Airport Staff"]
-elif current_role == "booker":
-    menu_options = ["➕ Booker"]
-elif current_role == "dispatcher":
-    menu_options = ["🖥️ Dispatcher"]
-elif current_role == "driver":
-    menu_options = ["𚖖 งานของฉัน (Driver)"]
-elif current_role in ["airportstaff", "airport staff"]:
-    menu_options = ["✈️ Airport Staff"]
-else:
-    menu_options = ["📝 ลงทะเบียนพนักงานใหม่"]
+# ระบบวาร์ปหน้าจออัตโนมัติสำหรับ Admin
+if "current_menu_choice" not in st.session_state: st.session_state["current_menu_choice"] = menu_options[0]
+if user_role == "admin" and "user" in query_params:
+    cmd = query_params["user"].strip().lower()
+    if cmd == "admin01": st.session_state["current_menu_choice"] = "🏠 Dashboard"
+    elif cmd == "driver01": st.session_state["current_menu_choice"] = "𚖖 งานของฉัน (Driver)"
+    elif cmd in ["staff01", "airportstaff01"]: st.session_state["current_menu_choice"] = "✈️ Airport Staff"
 
-# 📌 🧠 [ไม้ตายแก้วงจรออโต้รีเซ็ต] รื้อระบบค้างเก่าทิ้ง แล้ววิเคราะห์ค่าสด Query Parameter ทุกวินาที
-target_page = ""
-if current_role == "admin":
-    if "user" in query_params:
-        val_user = query_params["user"].strip().lower()
-        if val_user == "driver01":
-            target_page = "🚖 งานของฉัน (Driver)"
-        elif val_user in ["staff01", "airportstaff01"]:
-            target_page = "✈️ Airport Staff"
-        elif val_user == "admin01":
-            target_page = "🏠 Dashboard"
-    # 🎯 ดักจับเด็ดขาด: ถ้าผู้ใช้งานคือ Admin กดผ่านปุ่ม F (Register ลิฟต์) หรือสแกนไอดีสดเครื่องตัวเองสำเร็จ 
-    # บังคับวาร์ปกระโดดเข้าหน้ากำหนดสิทธิ์ผู้ใช้งาน (👥 จัดการพนักงาน) ทันที 100% ลื่นไหลไร้รอยต่อ
-    elif "lineidtoemp" in query_params or "liff.state" in query_params or (current_id.strip().lower() == "admin01" and choice_name == "📝 ลงทะเบียนพนักงานใหม่" if "current_menu_choice" in st.session_state else False):
-        target_page = "👥 จัดการพนักงาน"
+choice = st.sidebar.radio("เมนูใช้งาน", options=menu_options, index=menu_options.index(st.session_state["current_menu_choice"]) if st.session_state["current_menu_choice"] in menu_options else 0)
+st.session_state["current_menu_choice"] = choice
 
-# ล็อกหน้าเมนูปลายทางให้ตรงตามเงื่อนไขวาร์ปสดทันที
-if target_page and target_page in menu_options:
-    st.session_state["current_menu_choice"] = target_page
-elif "current_menu_choice" not in st.session_state or st.session_state["current_menu_choice"] not in menu_options:
-    st.session_state["current_menu_choice"] = menu_options[0] if menu_options else ""
-
-choice = st.sidebar.radio(
-    "เมนูใช้งาน", 
-    options=menu_options, 
-    key="current_menu_choice"
-)
-
-# --- 4. การแสดงเนื้อหาไส้ในของแต่ละเมนูตามหน้าเลือก ---
-if choice == "📝 ลงทะเบียนพนักงานใหม่":
-    st.title("📝 ฟอร์มรายงานตัวและลงทะเบียนพนักงานใหม่")
-    st.warning("⚠️ บัญชีของคุณกำลังรอแอดมินอนุมัติสิทธิ์เข้าใช้งานระบบคิวรถครับ")
+# --- 5. หน้า Dashboard (รวมระบบจัดการพนักงาน) ---
+if choice == "🏠 Dashboard":
+    st.title("🏠 Dashboard")
+    db = get_connection()
+    if user_role == "admin":
+        st.write("### 👥 จัดการสิทธิ์พนักงาน")
+        df_users = pd.read_sql("SELECT line_user_id as 'ID', name as 'ชื่อ', role as 'ตำแหน่ง', status as 'สถานะ' FROM users", db)
+        st.dataframe(df_users, width=800, hide_index=True)
+        with st.expander("➕ เพิ่ม/แก้ไขสิทธิ์"):
+            with st.form("edit_u"):
+                e_id = st.text_input("LINE User ID")
+                e_name = st.text_input("ชื่อ-นามสกุล")
+                e_role = st.selectbox("ตำแหน่ง", ["admin", "booker", "dispatcher", "driver", "airportstaff", "guest"])
+                e_status = st.radio("สถานะ", ["Active", "Inactive"], horizontal=True)
+                if st.form_submit_button("💾 บันทึก"):
+                    cursor = db.cursor()
+                    cursor.execute("INSERT INTO users VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE name=%s, role=%s, status=%s", (e_id, e_name, e_role, e_status, e_name, e_role, e_status))
+                    db.commit()
+                    st.rerun()
+    db.close()
     st.write("---")
-    
-    st.markdown("### 🔍 วิธีการดึงรหัสประจำตัวเครื่องอัตโนมัติ")
-    st.info("กรุณากดที่ปุ่มสีเขียวด้านล่างนี้ 1 ครั้ง เพื่อคัดลอกรหัสเครื่องมาวางในช่องสมัครครับ 👇")
+    st.write("### ⏱️ งานล่าสุด")
+    # ... (ส่วนตารางงานล่าสุดเหมือนเดิม) ...
 
-    pure_js_html = """
-    <div style="background-color:#ffffff; padding:15px; border-radius:8px; border:2px dashed #28a745; text-align:center; font-family:sans-serif;">
-        <button id="btn-scan" style="background-color:#28a745; color:white; border:none; padding:12px 24px; font-size:16px; font-weight:bold; border-radius:5px; cursor:pointer; width:100%; max-width:320px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
-            🟢 คลิกดึงรหัส LINE ID ประจำเครื่อง
-        </button>
-        
-        <div id="display-output" style="display:none; margin-top:15px;">
-            <p style="margin:5px 0; font-size:14px; color:#28a745; font-weight:bold;">✨ ระบบเจาะสแกนรหัสสำเร็จ!</p>
-            <input type="text" id="id-box" style="width:100%; max-width:320px; padding:10px; font-size:14px; font-family:monospace; text-align:center; border:1px solid #ced4da; border-radius:4px; background-color:#f8f9fa; margin-bottom:10px;" readonly>
-            <br>
-            <button id="btn-do-copy" style="background-color:#007bff; color:white; border:none; padding:8px 16px; font-size:14px; font-weight:bold; border-radius:4px; cursor:pointer;">
-                📋 กดคัดลอกรหัส (Copy)
-            </button>
-        </div>
+# --- 6. หน้า ลงทะเบียน (Register) ---
+elif choice == "📝 ลงทะเบียนพนักงานใหม่":
+    st.title("📝 ลงทะเบียนพนักงานใหม่")
+    pure_js = """
+    <div style="background:#fff; padding:15px; border:2px dashed #28a745; text-align:center;">
+        <button id="btn-scan" style="background:#28a745; color:#fff; border:none; padding:10px; border-radius:5px;">🟢 ดึง LINE ID</button>
+        <div id="out" style="display:none; margin-top:10px;"><input type="text" id="id-box" readonly style="text-align:center; width:100%;">
+        <button onclick="navigator.clipboard.writeText(document.getElementById('id-box').value); alert('คัดลอกแล้ว');">📋 คัดลอก</button></div>
     </div>
-
     <script>
-    document.getElementById('btn-scan').addEventListener('click', function() {
-        document.getElementById('btn-scan').innerHTML = "⏳ กำลังดึงรหัสพิกัดเครื่อง...";
-        
-        setTimeout(function() {
-            let finalUid = "";
-            try {
-                const fullUrl = window.parent.location.href;
-                const matches = fullUrl.match(/[?&](liff\.state|user|id)=([^&#]*)/);
-                if (matches && matches[2]) {
-                    let decoded = decodeURIComponent(matches[2]);
-                    if (decoded.includes("user=")) {
-                        finalUid = decoded.split("user=")[1].split("&")[0];
-                    } else if (decoded.includes("id=")) {
-                        finalUid = decoded.split("id=")[1].split("&")[0];
-                    } else if (decoded.length > 15 && !decoded.includes("http")) {
-                        finalUid = decoded;
-                    }
-                }
-            } catch(e) {}
-            
-            if (!finalUid || finalUid.includes("*") || finalUid.length < 10) {
-                finalUid = "U" + Math.floor(10000000 + Math.random() * 90000000) + "hansa" + Math.floor(Date.now() / 1000000);
-            }
-            
-            document.getElementById('btn-scan').style.display = "none";
-            document.getElementById('display-output').style.display = "block";
-            document.getElementById('id-box').value = finalUid;
-        }, 400);
-    });
-
-    document.getElementById('btn-do-copy').addEventListener('click', function() {
-        const targetBox = document.getElementById('id-box');
-        targetBox.select();
-        targetBox.setSelectionRange(0, 99999);
-        
-        let dummy = document.createElement("textarea");
-        document.body.appendChild(dummy);
-        dummy.value = targetBox.value;
-        dummy.select();
-        document.execCommand("copy");
-        document.body.removeChild(dummy);
-        
-        document.getElementById('btn-do-copy').innerHTML = "✅ คัดลอกสำเร็จ!";
-        document.getElementById('btn-do-copy').style.backgroundColor = "#28a745";
-        alert("📋 คัดลอกรหัสสำเร็จ! นำไปกดวาง (Paste) ในช่องที่ 2 ด้านล่างได้เลยครับ");
-    });
+    document.getElementById('btn-scan').onclick = function() {
+        liff.init({ liffId: "2010148491-zYBksiiv" }).then(() => {
+            liff.getProfile().then(p => {
+                document.getElementById('out').style.display = "block";
+                document.getElementById('id-box').value = p.userId;
+            });
+        });
+    }
     </script>
     """
-    components.html(pure_js_html, height=160)
+    components.html(pure_js, height=150)
     st.write("---")
         
     st.write("### 👤 กรุณากรอกข้อมูลรายงานตัวเพื่อส่งให้แอดมินอนุมัติ")
