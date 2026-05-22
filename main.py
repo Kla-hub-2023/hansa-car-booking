@@ -5,8 +5,9 @@ import requests
 from datetime import datetime
 import io
 import datetime as dt_module
+from urllib.parse import parse_qs, urlparse
 
-# --- 1. การตั้งค่า基礎และการเชื่อมต่อ DB ---
+# --- 1. การตั้งค่าพื้นฐานและการเชื่อมต่อ DB ---
 def get_connection():
     return pymysql.connect(
         host='mysql-22653bef-kla-e55d.c.aivencloud.com',
@@ -83,12 +84,23 @@ st.markdown("""
 if "default_user_id" not in st.session_state:
     st.session_state["default_user_id"] = ""
 
-# 📌 ดักจับแกะรอยค่าพารามิเตอร์ URL ที่สมบูรณ์และล้างค่าขยะ
+# 🚀 [มหาเวทย์แกะรหัสล็อก] ดักสแกนพารามิเตอร์ URL ทุกมิติ ทั้งแบบตรงและแบบเข้ารหัส liff.state ของแอป LINE
 query_params = st.query_params
+extracted_id = ""
+
 if "user" in query_params:
-    val = query_params["user"].strip()
-    if "http" not in val.lower() and "line.me" not in val.lower():
-        st.session_state.default_user_id = val
+    extracted_id = query_params["user"].strip()
+elif "liff.state" in query_params:
+    # ทริคเด็ด: เจาะเข้าท่อเข้ารหัสลับของ LINE เพื่อแกะคำว่า user= ออกมาจากท่อ liff.state
+    raw_state = query_params["liff.state"].strip()
+    if "user=" in raw_state:
+        extracted_id = raw_state.split("user=")[-1].split("&")[0].strip()
+    elif "%3Fuser%3D" in raw_state:
+        extracted_id = raw_state.split("%3Fuser%3D")[-1].split("%26")[0].strip()
+
+# คัดกรองความสะอาดของรหัสก่อนยัดเข้าฟอร์ม
+if extracted_id and "http" not in extracted_id.lower() and "line.me" not in extracted_id.lower() and len(extracted_id) > 10:
+    st.session_state.default_user_id = extracted_id
 
 st.sidebar.title("🔐 เข้าสู่ระบบ")
 
@@ -116,7 +128,7 @@ elif current_role == "booker":
 elif current_role == "dispatcher":
     menu_options = ["🖥️ Dispatcher"]
 elif current_role == "driver":
-    menu_options = ["𚖖 งานของฉัน (Driver)"]
+    menu_options = ["🚖 งานของฉัน (Driver)"]
 elif current_role in ["airportstaff", "airport staff"]:
     menu_options = ["✈️ Airport Staff"]
 else:
@@ -138,7 +150,7 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
     st.warning("⚠️ บัญชีของคุณกำลังรอแอดมินอนุมัติสิทธิ์เข้าใช้งานระบบคิวรถครับ")
     st.write("---")
     
-    # 🚀 โชว์กล่องข้อความต้อนรับและแสดงรหัสตัว U ของจริงให้เห็นทันทีเมื่อระบุค่าได้สำเร็จ
+    # ตรวจสอบว่าได้รหัสตัว U จริง ๆ หรือไม่
     has_real_id = current_id and current_id.strip() != "" and len(current_id) > 15
     
     if has_real_id:
@@ -147,7 +159,8 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
         st.code(current_id, language="text")
         st.write("---")
     else:
-        st.error("ℹ️ หากระบบไม่โชว์รหัสตัว U อัตโนมัติ รบกวนแจ้งแอดมินเพื่อขอรหัสผ่านหน้าห้องแชทไลน์มาวางสมัครได้ครับ")
+        # 📌 ปรับข้อความตัวสีชมพูใหม่ให้อ่านง่าย สบายตา พนักงานไม่ตกใจครับ
+        st.info("ℹ️ ระบบล็อกอินอัจฉริยะกำลังเตรียมความพร้อม... หากรหัสประจำตัวเครื่องไม่ขึ้นออโต้ แอดมินสามารถส่องดูไอดีจากหน้าแชทหลังบ้านมาวางให้ได้ครับ")
         st.write("---")
         
     st.write("### 👤 กรุณากรอกข้อมูลรายงานตัวเพื่อส่งให้แอดมินอนุมัติ")
@@ -432,7 +445,7 @@ elif "Dispatcher" in choice:
             st.info("ไม่มีรายการงานในระบบ")
 
 elif "Driver" in choice:
-    st.title("🚖 งานที่ได้รับมอบหมาย (Driver)")
+    st.title("𚖖 งานที่ได้รับมอบหมาย (Driver)")
     driver_name = "ไม่ระบุชื่อ"
     try:
         db = get_connection()
