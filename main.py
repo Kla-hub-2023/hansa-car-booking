@@ -96,7 +96,6 @@ if "default_user_id" not in st.session_state:
 query_params = st.query_params
 extracted_id = ""
 
-# ระบบดักรับค่าพารามิเตอร์อัจฉริยะคู่ขนาน
 if "lineidtoemp" in query_params:
     raw_val = query_params["lineidtoemp"].strip()
     if "*" not in raw_val and len(raw_val) > 15:
@@ -144,7 +143,7 @@ else:
 if "current_menu_choice" not in st.session_state or st.session_state["current_menu_choice"] not in menu_options:
     st.session_state["current_menu_choice"] = menu_options[0] if menu_options else ""
 
-# 📌 🧠 [ระบบรู้ใจแอดมินกล้า] วาร์ปออโต้สลับหน้าตามปุ่มริชเมนูที่แอดมินกดเปิดเข้าเว็บมา
+# 📌 🧠 [ระบบควบคุมท่อวาร์ปอัจฉริยะ] สลับหน้าตรงกันเป๊ะตามชื่อเมนูฝั่ง Admin แบบไร้บั๊กอักษรหลอน
 if current_role == "admin" and "menu_initialized" not in st.session_state:
     if "user" in query_params:
         val_user = query_params["user"].strip().lower()
@@ -155,7 +154,6 @@ if current_role == "admin" and "menu_initialized" not in st.session_state:
         elif val_user == "admin01":
             st.session_state["current_menu_choice"] = "🏠 Dashboard"
     elif "lineidtoemp" in query_params or "liff.state" in query_params:
-        # 🎯 ดักจับ: ถ้าแอดมินใช้ไลน์ตัวเองกดปุ่ม F (Register) ระบบจะเปลี่ยนหน้าเปิดเมนูกำหนดสิทธิ์ผู้ใช้งานให้ทันที!
         st.session_state["current_menu_choice"] = "👥 จัดการพนักงาน"
     st.session_state["menu_initialized"] = True
 
@@ -245,7 +243,7 @@ if choice == "📝 ลงทะเบียนพนักงานใหม่"
     st.write("### 👤 กรุณากรอกข้อมูลรายงานตัวเพื่อส่งให้แอดมินอนุมัติ")
     
     with st.form("guest_register_form", clear_on_submit=True):
-        reg_name = st.text_input("1. ระบุ ชื่อ - นามสกุลจริงของคุณ", placeholder="เช่น นายสมชาย ใจดีมาก").strip()
+        reg_name = st.text_input("1. กรุณากรอก ชื่อ - นามสกุลจริงของคุณ", placeholder="เช่น นายสมชาย ใจดีมาก").strip()
         reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (รหัสตัว U 33 หลัก)", value=current_id if current_id else "", placeholder="กดคัดลอกรหัสจากกล่องด้านบน แล้วนำมาวางใส่ในช่องนี้ครับ")
             
         submit_reg = st.form_submit_button("🚀 ส่งข้อมูลลงทะเบียนระบบคิวรถ")
@@ -274,9 +272,6 @@ if choice == "📝 ลงทะเบียนพนักงานใหม่"
                     st.error(f"เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
 
 elif choice == "🏠 Dashboard":
-    if current_role == "admin":
-        st.success("👑 ยินดีต้อนรับกลับเข้าสู่ระบบครับ แอดมินกล้า (Admin Level Max) | ระบบความปลอดภัยยืนยันสิทธิ์ถูกต้องเรียบร้อย")
-
     st.title("🏠 หน้าแรกและภาพรวมระบบ (Dashboard)")
     st.markdown(f"สวัสดีครับแอดมิน Status การเชื่อมต่อ **ระบบปกติดีเยี่ยม** ครับ")
     st.write("---")
@@ -733,7 +728,7 @@ elif choice == "👥 จัดการพนักงาน":
                 else: st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
 
     st.write("---")
-    st.write("### 📋 รายชื่อพนักงานและระดับสิทธิ์ปัจจุบัน in คลาวด์")
+    st.write("### 📋 รายชื่อพนักงานและระดับสิทธิ์ปัจจุบันในคลาวด์")
     try:
         db = get_connection()
         with db.cursor() as cursor:
