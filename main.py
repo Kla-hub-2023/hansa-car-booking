@@ -35,15 +35,19 @@ def check_permission(user_id, line_name=None):
     if not user_id or user_id.strip() == "" or user_id.strip().lower() == "none" or user_id.startswith("GUEST_") or "line.me" in user_id.lower() or "http" in user_id.lower() or "*" in user_id:
         return "guest"
         
-    if user_id == "admin01":
+    # ล้างค่าการสะกดตัวพิมพ์ให้เป็นมาตรฐานพิมพ์เล็กทั้งหมด ดักจับปุ่มริชเมนูแอดมินได้แม่นยำ
+    uid_clean = user_id.strip().lower()
+    if uid_clean == "admin01":
         return "admin"
-    elif user_id == "booker01":
+    elif uid_clean == "booker01":
         return "booker"
-    elif user_id == "dispatcher01":
+    elif uid_clean == "dispatcher01":
         return "dispatcher"
-    elif user_id == "driver01":
+    elif uid_clean == "driver01":
         return "driver"
-    elif user_id == "airportstaff01":
+    elif uid_clean == "airportstaff01":
+        return "airportstaff"
+    elif uid_clean == "staff01":
         return "airportstaff"
         
     try:
@@ -53,7 +57,7 @@ def check_permission(user_id, line_name=None):
             result = cursor.fetchone()
             
             if result:
-                role_res = result[0]
+                role_res = str(result[0]).strip().lower()
                 status_res = result[1] if result[1] else "Active"
                 if status_res == "Inactive":
                     return "guest"
@@ -127,19 +131,18 @@ menu_options = []
 current_role = user_role.strip().lower()
 
 if current_role == "admin":
-    menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "👥 จัดการพนักงาน", "𚖖 งานของฉัน (Driver)", "✈️ Airport Staff"]
+    menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "👥 จัดการพนักงาน", "🚖 งานของฉัน (Driver)", "✈️ Airport Staff"]
 elif current_role == "booker":
     menu_options = ["➕ Booker"]
 elif current_role == "dispatcher":
     menu_options = ["🖥️ Dispatcher"]
 elif current_role == "driver":
-    menu_options = ["𚖖 งานของฉัน (Driver)"]
+    menu_options = ["🚖 งานของฉัน (Driver)"]
 elif current_role in ["airportstaff", "airport staff"]:
     menu_options = ["✈️ Airport Staff"]
 else:
     menu_options = ["📝 ลงทะเบียนพนักงานใหม่"]
 
-# 📌 🧠 [จุดแก้ไขเพิ่มความเสถียร] ล้างค่าเมนูเอ๋อค้างเก่าออก หากเปลี่ยนกลุ่มสิทธิ์ผู้ใช้งาน
 if "current_menu_choice" not in st.session_state or st.session_state["current_menu_choice"] not in menu_options:
     st.session_state["current_menu_choice"] = menu_options[0] if menu_options else ""
 
@@ -431,7 +434,7 @@ elif "Dispatcher" in choice:
             st.write("### 📊 ตารางสถานะงานปัจจุบัน (กำลังรอรับ/กำลังเดินทาง)")
             st.dataframe(df_display, width='stretch', hide_index=True, column_config={"id": None})
         else:
-            st.info("✨ 没有งานค้างในระบบปัจจุบัน")
+            st.info("✨ ไม่มีงานค้างในระบบปัจจุบัน")
     except Exception as e:
         st.error(f"เกิดข้อผิดพลาดในการดึงตารางงาน: {e}")
     finally:
@@ -577,7 +580,7 @@ elif "driver" in choice:
                     except Exception as e: st.error(f"❌ ไม่สามารถเปลี่ยนสถานะงานได้: {e}")
                     finally:
                         if 'db' in locals() and db.open: db.close()
-    else: st.success("✨ 沒有งานปัจจุบันค้างอยู่")
+    else: st.success("✨ ไม่มีงานปัจจุบันค้างอยู่")
 
     st.write("---")
     st.write("### ✅ ประวัติการวิ่งงานที่เสร็จสิ้นแล้ว (Completed)")
@@ -671,7 +674,7 @@ elif "จัดการพนักงาน" in choice:
             new_role = st.selectbox("กำหนดตำแหน่ง (Role)", roles_pool, index=roles_pool.index(init_role) if init_role in roles_pool else 3)
             status_pool = ["Active", "Inactive"]
             new_status = st.radio("🚦 Status การใช้งานระบบ", status_pool, index=status_pool.index(init_status) if init_status in status_pool else 0, horizontal=True)
-            submit_user = st.form_submit_button("💾 อนุมัติและบันทิทธิ์")
+            submit_user = st.form_submit_button("💾 อนุมัติและบันทึกสิทธิ์")
             
             if submit_user:
                 if new_line_id and new_name:
@@ -693,4 +696,25 @@ elif "จัดการพนักงาน" in choice:
             st.write("❌ **โซนอันตราย: ลบพนักงานออกจากระบบ**")
             user_to_delete = st.selectbox("เลือกรายชื่อที่จะลบทิ้งเด็ดขาด", options=list(user_list_options.keys()))
             confirm_delete = st.checkbox("⚠️ ยืนยันว่าต้องการลบข้อมูลพนักงานคนนี้จริง ๆ")
-            st.form_submit_button("🗑️ ลบพนักงานออกถาวร")
+            btn_delete = st.form_submit_button("🗑️ ลบพนักงานออกถาวร")
+            
+            if btn_delete:
+                if confirm_delete and user_to_delete:
+                    target_del_id = user_list_options[user_to_delete][0]
+                    target_del_name = user_list_options[user_to_delete][1]
+                    try:
+                        conn = get_connection()
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT COUNT(*) FROM bookings WHERE driver_id = %s", (target_del_id,))
+                        has_history = cursor.fetchone()[0]
+                        if has_history > 0:
+                            st.error(f"❌ ไม่สามารถลบคุณ {target_del_name} ได้ เนื่องจากมีประวัติการวิ่งงานในระบบแล้ว (แนะนำให้เปลี่ยนสถานะเป็น Inactive แทน เพื่อความปลอดภัยของข้อมูลบัญชี)")
+                        else:
+                            cursor.execute("DELETE FROM users WHERE line_user_id = %s", (target_del_id,))
+                            conn.commit()
+                            st.success(f"🗑️ ลบข้อมูลพนักงานทดสอบคุณ {target_del_name} เรียบร้อยแล้ว!")
+                            st.rerun()
+                        cursor.close()
+                        conn.close()
+                    except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
+                else: st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
