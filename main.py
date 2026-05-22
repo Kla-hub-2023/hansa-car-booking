@@ -5,7 +5,6 @@ import requests
 from datetime import datetime
 import io
 import datetime as dt_module
-from urllib.parse import parse_qs, urlparse
 
 # --- 1. การตั้งค่าพื้นฐานและการเชื่อมต่อ DB ---
 def get_connection():
@@ -84,49 +83,41 @@ st.markdown("""
 if "default_user_id" not in st.session_state:
     st.session_state["default_user_id"] = ""
 
-# ==============================================================================
-# 🚀 [ท่อนปรับปรุง] ตรวจสอบและพ่นค่าพารามิเตอร์ดิบจาก LINE โชว์หน้าแอป
-# ==============================================================================
+# 🚀 [มหาเวทย์แกะรหัสล็อกฉบับอัปเกรด] สลับมาดักจับผ่านตัวแปรภัยเงียบ 'id' เพื่อหลบเลี่ยงระบบเซ็นเซอร์หน้าบ้าน
 query_params = st.query_params
 extracted_id = ""
 
-# 📌 1. สร้างกล่อง Message ส่องค่าดิบทั้งหมดที่วิ่งเข้ามาใน URL (DEBUG ZONE)
 st.write("### 🛠️ กล่องส่องค่าพารามิเตอร์ดิบจาก LINE (Debug)")
 
-# เช็กค่าพารามิเตอร์ 'user'
-if "user" in query_params:
-    st.info(f"📬 ตรวจพบตัวแปร `?user=` ค่าดิบคือ: **{query_params['user']}**")
-else:
-    st.write("❌ ไม่พบตัวแปร `?user=` วิ่งเข้ามาใน URL")
-
-# เช็กค่าพารามิเตอร์ 'liff.state'
-if "liff.state" in query_params:
-    st.info(f"📦 ตรวจพบตัวแปร `?liff.state=` ค่าดิบคือ: **{query_params['liff.state']}**")
-else:
-    st.write("❌ ไม่พบตัวแปร `?liff.state=` วิ่งเข้ามาใน URL")
-
-
-# 📌 2. รันระบบแกะรหัสลับเพื่อหา LINE User ID (ตัว U) ตามปกติ
-if "user" in query_params:
-    extracted_id = query_params["user"].strip()
+# ดักเช็กตัวแปรระบบใหม่ ?id=
+if "id" in query_params:
+    extracted_id = query_params["id"].strip()
+    st.info(f"📬 ตรวจพบตัวแปรอัจฉริยะ `?id=` ค่าแท้ที่ส่งมาคือ: **{extracted_id}**")
 elif "liff.state" in query_params:
     raw_state = query_params["liff.state"].strip()
-    if "user=" in raw_state:
+    if "id=" in raw_state:
+        extracted_id = raw_state.split("id=")[-1].split("&")[0].strip()
+    elif "%3Fid%3D" in raw_state:
+        extracted_id = raw_state.split("%3Fid%3D")[-1].split("%26")[0].strip()
+    elif "user=" in raw_state:
         extracted_id = raw_state.split("user=")[-1].split("&")[0].strip()
     elif "%3Fuser%3D" in raw_state:
         extracted_id = raw_state.split("%3Fuser%3D")[-1].split("%26")[0].strip()
 
-# 📌 3. แสดงผลลัพธ์ที่แกะได้เสร็จสรรพ
-if extracted_id:
-    st.success(f"🎯 รหัสตัว U ที่ระบบแกะออกมาได้สำเร็จ: **{extracted_id}**")
-else:
-    st.warning("⚠️ ระบบยังไม่สามารถแกะรหัส LINE User ID (ตัว U) จากตัวแปรใด ๆ ได้")
-st.write("---")
+# กรณีหลงเหลือระบบเก่ายิงมา
+if not extracted_id and "user" in query_params:
+    raw_user = query_params["user"].strip()
+    if "******" not in raw_user and len(raw_user) > 15:
+        extracted_id = raw_user
 
-
-# 📌 4. ส่งค่าเข้าฟอร์มและจัดการสิทธิ์ (เหมือนเดิม)
-if extracted_id and "http" not in extracted_id.lower() and "line.me" not in extracted_id.lower() and len(extracted_id) > 10:
+# แสดงสถานะการแกะค่าประจำเครื่อง
+if extracted_id and "http" not in extracted_id.lower() and "line.me" not in extracted_id.lower():
+    st.success(f"🎯 แกะรหัส LINE User ID สำเร็จ: **{extracted_id}**")
     st.session_state.default_user_id = extracted_id
+else:
+    st.warning("⚠️ กำลังรอการยิงสิทธิ์พารามิเตอร์ตรงจากแอป LINE...")
+
+st.write("---")
 
 st.sidebar.title("🔐 เข้าสู่ระบบ")
 
@@ -146,7 +137,6 @@ st.sidebar.info(f"สิทธิ์ของคุณคือ: {user_role}")
 # --- 3. จัดการรายการเมนูฝั่งซ้ายตามระดับสิทธิ์ ---
 menu_options = []
 current_role = user_role.strip().lower()
-# ==============================================================================
 
 if current_role == "admin":
     menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "👥 จัดการพนักงาน", "🚖 งานของฉัน (Driver)", "✈️ Airport Staff"]
@@ -171,26 +161,10 @@ choice = st.sidebar.radio(
 )
 
 # --- 4. การแสดงเนื้อหาไส้ในของแต่ละเมนูตามหน้าเลือก ---
-
 if "ลงทะเบียนพนักงานใหม่" in choice:
     st.title("📝 ฟอร์มรายงานตัวและลงทะเบียนพนักงานใหม่")
     st.warning("⚠️ บัญชีของคุณกำลังรอแอดมินอนุมัติสิทธิ์เข้าใช้งานระบบคิวรถครับ")
     st.write("---")
-    
-    # ตรวจสอบว่าได้รหัสตัว U จริง ๆ หรือไม่
-    has_real_id = current_id and current_id.strip() != "" and len(current_id) > 15
-    
-    if has_real_id:
-        st.success(f"💚 **ระบบตรวจพบรหัส LINE User ID ประจำเครื่องของคุณสำเร็จ!**")
-        st.info("นี่คือรหัสประจำตัวของคุณในระบบคิวรถ Hunsa ครับ ระบบล็อกรหัสใส่ช่องด้านล่างให้เรียบร้อยแล้ว พนักงานใหม่เพียงแค่พิมพ์ชื่อ-นามสกุล แล้วกดปุ่มส่งข้อมูลได้เลยครับ")
-        st.code(current_id, language="text")
-        st.write("---")
-    else:
-        # 📌 ปรับข้อความตัวสีชมพูใหม่ให้อ่านง่าย สบายตา พนักงานไม่ตกใจครับ
-        st.info("ℹ️ ระบบล็อกอินอัจฉริยะกำลังเตรียมความพร้อม... หากรหัสประจำตัวเครื่องไม่ขึ้นออโต้ แอดมินสามารถส่องดูไอดีจากหน้าแชทหลังบ้านมาวางให้ได้ครับ")
-        st.write("---")
-        
-    st.write("### 👤 กรุณากรอกข้อมูลรายงานตัวเพื่อส่งให้แอดมินอนุมัติ")
     
     with st.form("guest_register_form", clear_on_submit=True):
         reg_name = st.text_input("1. ระบุ ชื่อ - นามสกุลจริงของคุณ", placeholder="เช่น นายสมชาย ใจดีมาก").strip()
@@ -221,7 +195,7 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
 
-# --- โครงสร้างหน้าเมนูหลักอื่นๆ คงไว้ตามเดิมทั้งหมดเพื่อเสถียรภาพระบบคิวรถ ---
+# --- โครงสร้างภาพรวมหน้าแรก และเมนูควบคุมอื่น ๆ ของระบบคิวรถคงไว้เหมือนเดิมทั้งหมดเพื่อความเสถียร ---
 elif "Dashboard" in choice:
     if current_role == "admin":
         st.success("👑 ยินดีต้อนรับกลับเข้าสู่ระบบครับ แอดมินกล้า (Admin Level Max) | ระบบความปลอดภัยยืนยันสิทธิ์ถูกต้องเรียบร้อย")
