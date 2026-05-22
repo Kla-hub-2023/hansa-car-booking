@@ -93,6 +93,7 @@ st.markdown("""
 if "default_user_id" not in st.session_state:
     st.session_state["default_user_id"] = ""
 
+# 📌 โหลดดักจับค่าพารามิเตอร์ URL ทันทีในระดับ Global
 query_params = st.query_params
 extracted_id = ""
 
@@ -134,28 +135,33 @@ elif current_role == "booker":
 elif current_role == "dispatcher":
     menu_options = ["🖥️ Dispatcher"]
 elif current_role == "driver":
-    menu_options = ["🚖 งานของฉัน (Driver)"]
+    menu_options = ["𚖖 งานของฉัน (Driver)"]
 elif current_role in ["airportstaff", "airport staff"]:
     menu_options = ["✈️ Airport Staff"]
 else:
     menu_options = ["📝 ลงทะเบียนพนักงานใหม่"]
 
-if "current_menu_choice" not in st.session_state or st.session_state["current_menu_choice"] not in menu_options:
-    st.session_state["current_menu_choice"] = menu_options[0] if menu_options else ""
-
-# 📌 🧠 [ระบบควบคุมท่อวาร์ปอัจฉริยะ] สลับหน้าตรงกันเป๊ะตามชื่อเมนูฝั่ง Admin แบบไร้บั๊กอักษรหลอน
-if current_role == "admin" and "menu_initialized" not in st.session_state:
+# 📌 🧠 [ไม้ตายแก้วงจรออโต้รีเซ็ต] รื้อระบบค้างเก่าทิ้ง แล้ววิเคราะห์ค่าสด Query Parameter ทุกวินาที
+target_page = ""
+if current_role == "admin":
     if "user" in query_params:
         val_user = query_params["user"].strip().lower()
         if val_user == "driver01":
-            st.session_state["current_menu_choice"] = "🚖 งานของฉัน (Driver)"
+            target_page = "🚖 งานของฉัน (Driver)"
         elif val_user in ["staff01", "airportstaff01"]:
-            st.session_state["current_menu_choice"] = "✈️ Airport Staff"
+            target_page = "✈️ Airport Staff"
         elif val_user == "admin01":
-            st.session_state["current_menu_choice"] = "🏠 Dashboard"
-    elif "lineidtoemp" in query_params or "liff.state" in query_params:
-        st.session_state["current_menu_choice"] = "👥 จัดการพนักงาน"
-    st.session_state["menu_initialized"] = True
+            target_page = "🏠 Dashboard"
+    # 🎯 ดักจับเด็ดขาด: ถ้าผู้ใช้งานคือ Admin กดผ่านปุ่ม F (Register ลิฟต์) หรือสแกนไอดีสดเครื่องตัวเองสำเร็จ 
+    # บังคับวาร์ปกระโดดเข้าหน้ากำหนดสิทธิ์ผู้ใช้งาน (👥 จัดการพนักงาน) ทันที 100% ลื่นไหลไร้รอยต่อ
+    elif "lineidtoemp" in query_params or "liff.state" in query_params or (current_id.strip().lower() == "admin01" and choice_name == "📝 ลงทะเบียนพนักงานใหม่" if "current_menu_choice" in st.session_state else False):
+        target_page = "👥 จัดการพนักงาน"
+
+# ล็อกหน้าเมนูปลายทางให้ตรงตามเงื่อนไขวาร์ปสดทันที
+if target_page and target_page in menu_options:
+    st.session_state["current_menu_choice"] = target_page
+elif "current_menu_choice" not in st.session_state or st.session_state["current_menu_choice"] not in menu_options:
+    st.session_state["current_menu_choice"] = menu_options[0] if menu_options else ""
 
 choice = st.sidebar.radio(
     "เมนูใช้งาน", 
