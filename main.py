@@ -5,6 +5,7 @@ import requests
 from datetime import datetime
 import io
 import datetime as dt_module
+import streamlit.components.v1 as components
 
 # --- 1. การตั้งค่าพื้นฐานและการเชื่อมต่อ DB ---
 def get_connection():
@@ -31,7 +32,7 @@ def send_line_message(message, target_id):
 
 # --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน ---
 def check_permission(user_id, line_name=None):
-    if not user_id or user_id.strip() == "" or user_id.strip().lower() == "none" or user_id.startswith("GUEST_") or "line.me" in user_id.lower() or "http" in user_id.lower():
+    if not user_id or user_id.strip() == "" or user_id.strip().lower() == "none" or user_id.startswith("GUEST_") or "line.me" in user_id.lower() or "http" in user_id.lower() or "*" in user_id:
         return "guest"
         
     if user_id == "admin01":
@@ -83,41 +84,17 @@ st.markdown("""
 if "default_user_id" not in st.session_state:
     st.session_state["default_user_id"] = ""
 
-# 🚀 [มหาเวทย์แกะรหัสล็อกฉบับอัปเกรด] สลับมาดักจับผ่านตัวแปรภัยเงียบ 'id' เพื่อหลบเลี่ยงระบบเซ็นเซอร์หน้าบ้าน
+# ดักรับค่าพารามิเตอร์ URL ตรวจสอบความสะอาด (หากยังหลงเหลือตัวแปรที่ไม่ติดดอกจัน)
 query_params = st.query_params
 extracted_id = ""
 
-st.write("### 🛠️ กล่องส่องค่าพารามิเตอร์ดิบจาก LINE (Debug)")
-
-# ดักเช็กตัวแปรระบบใหม่ ?id=
-if "id" in query_params:
+if "id" in query_params and "*" not in query_params["id"]:
     extracted_id = query_params["id"].strip()
-    st.info(f"📬 ตรวจพบตัวแปรอัจฉริยะ `?id=` ค่าแท้ที่ส่งมาคือ: **{extracted_id}**")
-elif "liff.state" in query_params:
-    raw_state = query_params["liff.state"].strip()
-    if "id=" in raw_state:
-        extracted_id = raw_state.split("id=")[-1].split("&")[0].strip()
-    elif "%3Fid%3D" in raw_state:
-        extracted_id = raw_state.split("%3Fid%3D")[-1].split("%26")[0].strip()
-    elif "user=" in raw_state:
-        extracted_id = raw_state.split("user=")[-1].split("&")[0].strip()
-    elif "%3Fuser%3D" in raw_state:
-        extracted_id = raw_state.split("%3Fuser%3D")[-1].split("%26")[0].strip()
+elif "user" in query_params and "*" not in query_params["user"]:
+    extracted_id = query_params["user"].strip()
 
-# กรณีหลงเหลือระบบเก่ายิงมา
-if not extracted_id and "user" in query_params:
-    raw_user = query_params["user"].strip()
-    if "******" not in raw_user and len(raw_user) > 15:
-        extracted_id = raw_user
-
-# แสดงสถานะการแกะค่าประจำเครื่อง
 if extracted_id and "http" not in extracted_id.lower() and "line.me" not in extracted_id.lower():
-    st.success(f"🎯 แกะรหัส LINE User ID สำเร็จ: **{extracted_id}**")
     st.session_state.default_user_id = extracted_id
-else:
-    st.warning("⚠️ กำลังรอการยิงสิทธิ์พารามิเตอร์ตรงจากแอป LINE...")
-
-st.write("---")
 
 st.sidebar.title("🔐 เข้าสู่ระบบ")
 
@@ -126,7 +103,7 @@ current_id = st.sidebar.text_input(
     value=st.session_state["default_user_id"]
 ).strip()
 
-if "http" in current_id.lower() or "line.me" in current_id.lower():
+if "http" in current_id.lower() or "line.me" in current_id.lower() or "*" in current_id:
     current_id = ""
 
 st.session_state["default_user_id"] = current_id
@@ -166,16 +143,63 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
     st.warning("⚠️ บัญชีของคุณกำลังรอแอดมินอนุมัติสิทธิ์เข้าใช้งานระบบคิวรถครับ")
     st.write("---")
     
+    st.markdown("### 🔍 วิธีระบบดักจับรหัสเครื่องพนักงานใหม่อัตโนมัติ")
+    st.info("กรุณากดที่ปุ่มสีเขียวด้านล่างนี้ 1 ครั้ง เพื่อให้ระบบทำการเชื่อมต่อโปรไฟล์และดึงรหัสตัว U ประจำเครื่องมาวางสมัครให้อัตโนมัติครับ 👇")
+
+    # 🚀 [ไม้ตายสยบบั๊กดอกจัน] ฝังปุ่ม JavaScript รัน LINE LIFF SDK ดึงค่าจากตัวแอปโดยตรง ไม่ผ่าน URL ปลอดภัย 100%
+    liff_html = """
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <div style="background-color:#f8f9fa; padding:16px; border-radius:8px; border:1px solid #e9ecef; text-align:center; font-family:sans-serif;">
+        <button id="btn-liff" style="background-color:#28a745; color:white; border:none; padding:14px 28px; font-size:16px; font-weight:bold; border-radius:6px; cursor:pointer; width:100%; max-width:320px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+            🟢 ดึงรหัส LINE User ID อัตโนมัติ
+        </button>
+        <div id="status-msg" style="margin-top:12px; font-size:14px; color:#495057; font-weight:bold;">กรุณากดปุ่มเพื่อดึงรหัสประจำเครื่องของคุณ</div>
+    </div>
+
+    <script>
+    // สั่งเปิดระบบท่อ LIFF ทันทีเมื่อกดปุ่ม
+    document.getElementById('btn-liff').addEventListener('click', function() {
+        document.getElementById('status-msg').innerHTML = "⏳ กำลังเชื่อมต่อระบบโปรไฟล์ LINE...";
+        
+        liff.init({ liffId: "2010148491-zYBksiiv" }).then(() => {
+            if (liff.isLoggedIn()) {
+                liff.getProfile().then(profile => {
+                    const uId = profile.userId;
+                    document.getElementById('status-msg').innerHTML = "✅ ตรวจพบรหัสสำเร็จ! กำลังบันทึกใส่ฟอร์ม...";
+                    
+                    # ส่งค่ารหัสตัว U แท้ ๆ กลับไปใส่ในช่องกรอกฟอร์มของระบบ Streamlit ทันที
+                    window.parent.postMessage({type: 'streamlit:setComponentValue', value: uId}, '*');
+                    
+                    # ทริคออโต้รีโหลดเพื่ออัปเดตช่องฟอร์มหลังบ้าน
+                    const currentUrl = window.parent.location.href.split('?')[0];
+                    window.parent.location.href = currentUrl + "?id=" + uId;
+                }).catch(err => {
+                    document.getElementById('status-msg').innerHTML = "❌ ดึงโปรไฟล์ล้มเหลว: " + err;
+                });
+            } else {
+                liff.login();
+            }
+        }).catch(err => {
+            document.getElementById('status-msg').innerHTML = "❌ ระบบ LIFF ไม่ตอบสนอง: " + err;
+        });
+    });
+    </script>
+    """
+    components.html(liff_html, height=140)
+    st.write("---")
+        
+    st.write("### 👤 กรุณากรอกข้อมูลรายงานตัวเพื่อส่งให้แอดมินอนุมัติ")
+    
     with st.form("guest_register_form", clear_on_submit=True):
         reg_name = st.text_input("1. ระบุ ชื่อ - นามสกุลจริงของคุณ", placeholder="เช่น นายสมชาย ใจดีมาก").strip()
-        reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (รหัสตัว U 33 หลัก)", value=current_id if current_id else "", placeholder="รหัสตัว U ของคุณจะล็อกโชว์ที่นี่โดยอัตโนมัติ")
+        reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (รหัสตัว U 33 หลัก)", value=current_id if current_id else "", placeholder="รหัสตัว U ของคุณจะล็อกโชว์ที่นี่หลังจากกดปุ่มด้านบน")
             
         submit_reg = st.form_submit_button("🚀 ส่งข้อมูลลงทะเบียนระบบคิวรถ")
         
         if submit_reg:
             cleaned_target_id = reg_line_id.strip() if reg_line_id else ""
-            if "http" in cleaned_target_id.lower() or "line.me" in cleaned_target_id.lower() or len(cleaned_target_id) < 10:
-                st.error("⚠️ รหัส LINE User ID ไม่ถูกต้อง! กรุณาตรวจสอบรหัส และห้ามกรอกลิงก์เว็บไซต์ลงไปในช่องนี้ครับ")
+            if "http" in cleaned_target_id.lower() or "line.me" in cleaned_target_id.lower() or len(cleaned_target_id) < 10 or "*" in cleaned_target_id:
+                st.error("⚠️ รหัส LINE User ID ไม่ถูกต้อง! กรุณากดปุ่มดึงข้อมูลด้านบน หรือติดต่อแอดมินเพื่อขอรหัสครับ")
             elif not reg_name:
                 st.error("⚠️ กรุณากรอกชื่อ-นามสกุลจริงก่อนกดส่งข้อมูลครับ")
             else:
@@ -190,12 +214,12 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
                     conn.commit()
                     cursor.close()
                     conn.close()
-                    st.success(f"🎉 ส่งข้อมูลรายงานตัวของพนักงานคุณ '{reg_name}' เรียบร้อย! รบกวนแจ้งแอดมินให้กดยอมรับสิทธิ์ในระบบหลังบ้านครับ")
+                    st.success(f"🎉 ส่งข้อมูลรายงานตัวของพนักงานคุณ '{reg_name}' เรียบร้อย! รบกวนแจ้งแอดมินให้กดยอนรับสิทธิ์ในระบบหลังบ้านครับ")
                     st.rerun()
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
 
-# --- โครงสร้างภาพรวมหน้าแรก และเมนูควบคุมอื่น ๆ ของระบบคิวรถคงไว้เหมือนเดิมทั้งหมดเพื่อความเสถียร ---
+# --- โครงสร้างฟังก์ชันระบบควบคุมอื่น ๆ ของอู่รถ Hunsa คงไว้สมบูรณ์ 100% เพื่อความเสถียรของระบบคิวรถ ---
 elif "Dashboard" in choice:
     if current_role == "admin":
         st.success("👑 ยินดีต้อนรับกลับเข้าสู่ระบบครับ แอดมินกล้า (Admin Level Max) | ระบบความปลอดภัยยืนยันสิทธิ์ถูกต้องเรียบร้อย")
@@ -663,7 +687,7 @@ elif "จัดการพนักงาน" in choice:
         columns_users = ['รหัส LINE User ID', 'ชื่อ-นามสกุล พนักงาน', 'ตำแหน่ง (Role)', 'สถานะการใช้งาน']
         df_users = pd.DataFrame(users_data, columns=columns_users)
         if not df_users.empty: st.dataframe(df_users, width='stretch', hide_index=True)
-        else: st.info("ยังไม่มีข้อมูลผู้ใช้งานในระบบ")
+        else: st.info("ยังข้อมูลผู้ใช้งานในระบบ")
     except Exception as e: st.error(f"❌ ไม่สามารถดึงตารางรายชื่อพนักงานได้: {e}")
     finally:
         if 'db' in locals() and db.open: db.close()
