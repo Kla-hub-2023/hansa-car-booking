@@ -84,16 +84,16 @@ st.markdown("""
 if "default_user_id" not in st.session_state:
     st.session_state["default_user_id"] = ""
 
-# ดักรับค่าพารามิเตอร์ URL ตรวจสอบความสะอาด (หากยังหลงเหลือตัวแปรที่ไม่ติดดอกจัน)
+# 📌 🧠 [มหาเวทย์แกะรหัสล็อกระดับ Advance] ดักสแกนคีย์เวิร์ดพิเศษ 'lineidtoemp' ไอเดียแอดมินกล้าเพื่อหนีการเซ็นเซอร์
 query_params = st.query_params
 extracted_id = ""
 
-if "id" in query_params and "*" not in query_params["id"]:
-    extracted_id = query_params["id"].strip()
-elif "user" in query_params and "*" not in query_params["user"]:
-    extracted_id = query_params["user"].strip()
+if "lineidtoemp" in query_params:
+    raw_val = query_params["lineidtoemp"].strip()
+    if "*" not in raw_val and len(raw_val) > 15:
+        extracted_id = raw_val
 
-if extracted_id and "http" not in extracted_id.lower() and "line.me" not in extracted_id.lower():
+if extracted_id:
     st.session_state.default_user_id = extracted_id
 
 st.sidebar.title("🔐 เข้าสู่ระบบ")
@@ -143,63 +143,65 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
     st.warning("⚠️ บัญชีของคุณกำลังรอแอดมินอนุมัติสิทธิ์เข้าใช้งานระบบคิวรถครับ")
     st.write("---")
     
-    st.markdown("### 🔍 วิธีระบบดักจับรหัสเครื่องพนักงานใหม่อัตโนมัติ")
-    st.info("กรุณากดที่ปุ่มสีเขียวด้านล่างนี้ 1 ครั้ง เพื่อให้ระบบทำการเชื่อมต่อโปรไฟล์และดึงรหัสตัว U ประจำเครื่องมาวางสมัครให้อัตโนมัติครับ 👇")
+    # แจ้งสถานะการตรวจจับไอดีประจำเครื่อง
+    if current_id and not current_id.startswith("GUEST_") and "*" not in current_id:
+        st.success(f"💚 **ระบบดักจับรหัสเครื่องของคุณสำเร็จ!**")
+        st.info(f"นี่คือรหัส LINE User ID ของคุณ: **{current_id}** (ระบบล็อกรหัสใส่ช่องสมัครด้านล่างให้เรียบร้อยแล้วครับ)")
+        st.write("---")
+    else:
+        st.markdown("### 🔍 วิธีระบบดักจับรหัสเครื่องพนักงานใหม่อัตโนมัติ")
+        st.info("กรุณากดที่ปุ่มสีเขียวด้านล่างนี้ 1 ครั้ง เพื่อให้ระบบทำการเชื่อมต่อโปรไฟล์และสลักล็อกรหัสตัว U ของคุณเข้าสู่ฟอร์มสมัครโดยตรงครับ 👇")
 
-    # 🚀 [ไม้ตายสยบบั๊กดอกจัน] ฝังปุ่ม JavaScript รัน LINE LIFF SDK ดึงค่าจากตัวแอปโดยตรง ไม่ผ่าน URL ปลอดภัย 100%
-    liff_html = """
-    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-    <div style="background-color:#f8f9fa; padding:16px; border-radius:8px; border:1px solid #e9ecef; text-align:center; font-family:sans-serif;">
-        <button id="btn-liff" style="background-color:#28a745; color:white; border:none; padding:14px 28px; font-size:16px; font-weight:bold; border-radius:6px; cursor:pointer; width:100%; max-width:320px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
-            🟢 ดึงรหัส LINE User ID อัตโนมัติ
-        </button>
-        <div id="status-msg" style="margin-top:12px; font-size:14px; color:#495057; font-weight:bold;">กรุณากดปุ่มเพื่อดึงรหัสประจำเครื่องของคุณ</div>
-    </div>
+        # 🚀 เปลี่ยนท่อ JavaScript ตัวจบ: ใช้คำสั่งออโต้รีโหลดลิงก์พ่วงคีย์เวิร์ดความลับ ?lineidtoemp= เพื่อทะลวงบล็อก
+        liff_html = """
+        <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+        <div style="background-color:#f8f9fa; padding:16px; border-radius:8px; border:1px solid #e9ecef; text-align:center; font-family:sans-serif;">
+            <button id="btn-liff" style="background-color:#28a745; color:white; border:none; padding:14px 28px; font-size:16px; font-weight:bold; border-radius:6px; cursor:pointer; width:100%; max-width:320px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+                🟢 คลิกเพื่อดึงรหัสประจำเครื่องของฉัน
+            </button>
+            <div id="status-msg" style="margin-top:12px; font-size:14px; color:#495057; font-weight:bold;">กรุณากดปุ่มเพื่อเปิดท่อดึงรหัสประจำเครื่อง</div>
+        </div>
 
-    <script>
-    // สั่งเปิดระบบท่อ LIFF ทันทีเมื่อกดปุ่ม
-    document.getElementById('btn-liff').addEventListener('click', function() {
-        document.getElementById('status-msg').innerHTML = "⏳ กำลังเชื่อมต่อระบบโปรไฟล์ LINE...";
-        
-        liff.init({ liffId: "2010148491-zYBksiiv" }).then(() => {
-            if (liff.isLoggedIn()) {
-                liff.getProfile().then(profile => {
-                    const uId = profile.userId;
-                    document.getElementById('status-msg').innerHTML = "✅ ตรวจพบรหัสสำเร็จ! กำลังบันทึกใส่ฟอร์ม...";
-                    
-                    # ส่งค่ารหัสตัว U แท้ ๆ กลับไปใส่ในช่องกรอกฟอร์มของระบบ Streamlit ทันที
-                    window.parent.postMessage({type: 'streamlit:setComponentValue', value: uId}, '*');
-                    
-                    # ทริคออโต้รีโหลดเพื่ออัปเดตช่องฟอร์มหลังบ้าน
-                    const currentUrl = window.parent.location.href.split('?')[0];
-                    window.parent.location.href = currentUrl + "?id=" + uId;
-                }).catch(err => {
-                    document.getElementById('status-msg').innerHTML = "❌ ดึงโปรไฟล์ล้มเหลว: " + err;
-                });
-            } else {
-                liff.login();
-            }
-        }).catch(err => {
-            document.getElementById('status-msg').innerHTML = "❌ ระบบ LIFF ไม่ตอบสนอง: " + err;
+        <script>
+        document.getElementById('btn-liff').addEventListener('click', function() {
+            document.getElementById('status-msg').innerHTML = "⏳ กำลังเชื่อมต่อระบบโปรไฟล์ LINE...";
+            
+            liff.init({ liffId: "2010148491-zYBksiiv" }).then(() => {
+                if (liff.isLoggedIn()) {
+                    liff.getProfile().then(profile => {
+                        const uId = profile.userId;
+                        document.getElementById('status-msg').innerHTML = "✅ ตรวจพบรหัสสำเร็จ! กำลังพาวาร์ปกรอกฟอร์ม...";
+                        
+                        // บังคับหน้าต่างหลักรีโหลดตัวเองทันที โดยพ่วงชื่อตัวแปรหนีการเซ็นเซอร์เจาะทะลวงเข้าหน้าฟอร์มตรง ๆ
+                        const mainUrl = window.parent.location.href.split('?')[0];
+                        window.parent.location.href = mainUrl + "?lineidtoemp=" + uId;
+                    }).catch(err => {
+                        document.getElementById('status-msg').innerHTML = "❌ ดึงโปรไฟล์ล้มเหลว: " + err;
+                    });
+                } else {
+                    liff.login();
+                }
+            }).catch(err => {
+                document.getElementById('status-msg').innerHTML = "❌ ระบบ LIFF ไม่ตอบสนอง: " + err;
+            });
         });
-    });
-    </script>
-    """
-    components.html(liff_html, height=140)
-    st.write("---")
+        </script>
+        """
+        components.html(liff_html, height=140)
+        st.write("---")
         
     st.write("### 👤 กรุณากรอกข้อมูลรายงานตัวเพื่อส่งให้แอดมินอนุมัติ")
     
     with st.form("guest_register_form", clear_on_submit=True):
         reg_name = st.text_input("1. ระบุ ชื่อ - นามสกุลจริงของคุณ", placeholder="เช่น นายสมชาย ใจดีมาก").strip()
-        reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (รหัสตัว U 33 หลัก)", value=current_id if current_id else "", placeholder="รหัสตัว U ของคุณจะล็อกโชว์ที่นี่หลังจากกดปุ่มด้านบน")
+        reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (รหัสตัว U 33 หลัก)", value=current_id if current_id else "", placeholder="รหัสตัว U ของคุณจะล็อกโชว์ที่นี่หลังจากกดปุ่มสีเขียวด้านบน")
             
         submit_reg = st.form_submit_button("🚀 ส่งข้อมูลลงทะเบียนระบบคิวรถ")
         
         if submit_reg:
             cleaned_target_id = reg_line_id.strip() if reg_line_id else ""
             if "http" in cleaned_target_id.lower() or "line.me" in cleaned_target_id.lower() or len(cleaned_target_id) < 10 or "*" in cleaned_target_id:
-                st.error("⚠️ รหัส LINE User ID ไม่ถูกต้อง! กรุณากดปุ่มดึงข้อมูลด้านบน หรือติดต่อแอดมินเพื่อขอรหัสครับ")
+                st.error("⚠️ รหัส LINE User ID ไม่ถูกต้อง! กรุณากดปุ่มสีเขียวดึงข้อมูลด้านบน หรือติดต่อแอดมินเพื่อขอรหัสครับ")
             elif not reg_name:
                 st.error("⚠️ กรุณากรอกชื่อ-นามสกุลจริงก่อนกดส่งข้อมูลครับ")
             else:
@@ -214,12 +216,12 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
                     conn.commit()
                     cursor.close()
                     conn.close()
-                    st.success(f"🎉 ส่งข้อมูลรายงานตัวของพนักงานคุณ '{reg_name}' เรียบร้อย! รบกวนแจ้งแอดมินให้กดยอนรับสิทธิ์ในระบบหลังบ้านครับ")
+                    st.success(f"🎉 ส่งข้อมูลรายงานตัวของพนักงานคุณ '{reg_name}' เรียบร้อย! รบกวนแจ้งแอดมินให้กดยอมรับสิทธิ์ในระบบหลังบ้านครับ")
                     st.rerun()
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
 
-# --- โครงสร้างฟังก์ชันระบบควบคุมอื่น ๆ ของอู่รถ Hunsa คงไว้สมบูรณ์ 100% เพื่อความเสถียรของระบบคิวรถ ---
+# --- โครงสร้างฟังก์ชันระบบควบคุมอื่น ๆ คีย์เวิร์ดของอู่รถ Hunsa คงไว้สมบูรณ์ 100% เพื่อความเสถียรของระบบคิวรถ ---
 elif "Dashboard" in choice:
     if current_role == "admin":
         st.success("👑 ยินดีต้อนรับกลับเข้าสู่ระบบครับ แอดมินกล้า (Admin Level Max) | ระบบความปลอดภัยยืนยันสิทธิ์ถูกต้องเรียบร้อย")
@@ -687,7 +689,7 @@ elif "จัดการพนักงาน" in choice:
         columns_users = ['รหัส LINE User ID', 'ชื่อ-นามสกุล พนักงาน', 'ตำแหน่ง (Role)', 'สถานะการใช้งาน']
         df_users = pd.DataFrame(users_data, columns=columns_users)
         if not df_users.empty: st.dataframe(df_users, width='stretch', hide_index=True)
-        else: st.info("ยังข้อมูลผู้ใช้งานในระบบ")
+        else: st.info("ยังไม่มีข้อมูลผู้ใช้งานในระบบ")
     except Exception as e: st.error(f"❌ ไม่สามารถดึงตารางรายชื่อพนักงานได้: {e}")
     finally:
         if 'db' in locals() and db.open: db.close()
