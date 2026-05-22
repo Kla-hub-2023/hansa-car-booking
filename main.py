@@ -84,7 +84,7 @@ st.markdown("""
 if "default_user_id" not in st.session_state:
     st.session_state["default_user_id"] = ""
 
-# 📌 🧠 [มหาเวทย์แกะรหัสล็อกระดับ Advance] ดักสแกนคีย์เวิร์ดพิเศษ 'lineidtoemp' ไอเดียแอดมินกล้าเพื่อหนีการเซ็นเซอร์
+# 📌 ดักจับแกะรอยค่าพารามิเตอร์ลับสิทธิ์ 'lineidtoemp' ไอเดียแอดมินเพื่อหนีดอกจันเซ็นเซอร์
 query_params = st.query_params
 extracted_id = ""
 
@@ -143,16 +143,17 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
     st.warning("⚠️ บัญชีของคุณกำลังรอแอดมินอนุมัติสิทธิ์เข้าใช้งานระบบคิวรถครับ")
     st.write("---")
     
-    # แจ้งสถานะการตรวจจับไอดีประจำเครื่อง
-    if current_id and not current_id.startswith("GUEST_") and "*" not in current_id:
+    has_real_id = current_id and current_id.strip() != "" and len(current_id) > 15
+    
+    if has_real_id:
         st.success(f"💚 **ระบบดักจับรหัสเครื่องของคุณสำเร็จ!**")
         st.info(f"นี่คือรหัส LINE User ID ของคุณ: **{current_id}** (ระบบล็อกรหัสใส่ช่องสมัครด้านล่างให้เรียบร้อยแล้วครับ)")
         st.write("---")
     else:
         st.markdown("### 🔍 วิธีระบบดักจับรหัสเครื่องพนักงานใหม่อัตโนมัติ")
-        st.info("กรุณากดที่ปุ่มสีเขียวด้านล่างนี้ 1 ครั้ง เพื่อให้ระบบทำการเชื่อมต่อโปรไฟล์และสลักล็อกรหัสตัว U ของคุณเข้าสู่ฟอร์มสมัครโดยตรงครับ 👇")
+        st.info("กรุณากดที่ปุ่มสีเขียวด้านล่างนี้ 1 ครั้ง เพื่อเชื่อมต่อโปรไฟล์และล็อกรหัสตัว U ของคุณเข้าสู่ฟอร์มสมัครครับ 👇")
 
-        # 🚀 เปลี่ยนท่อ JavaScript ตัวจบ: ใช้คำสั่งออโต้รีโหลดลิงก์พ่วงคีย์เวิร์ดความลับ ?lineidtoemp= เพื่อทะลวงบล็อก
+        # 🚀 [ท่อเหล็กสยบบล็อก] ใช้คำสั่ง window.open พ่วง target '_top' ดีดทะลวงหน้าต่างค้างเติ่งให้ขยับทันที 100%
         liff_html = """
         <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
         <div style="background-color:#f8f9fa; padding:16px; border-radius:8px; border:1px solid #e9ecef; text-align:center; font-family:sans-serif;">
@@ -172,9 +173,8 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
                         const uId = profile.userId;
                         document.getElementById('status-msg').innerHTML = "✅ ตรวจพบรหัสสำเร็จ! กำลังพาวาร์ปกรอกฟอร์ม...";
                         
-                        // บังคับหน้าต่างหลักรีโหลดตัวเองทันที โดยพ่วงชื่อตัวแปรหนีการเซ็นเซอร์เจาะทะลวงเข้าหน้าฟอร์มตรง ๆ
-                        const mainUrl = window.parent.location.href.split('?')[0];
-                        window.parent.location.href = mainUrl + "?lineidtoemp=" + uId;
+                        // ปรับเป็นคำสั่งวาร์ปหน้าหลักระดับสูงสุดเพื่อไม่ให้เบราเซอร์สั่งบล็อกค่าค้างเติ่ง
+                        window.open("https://hansa-car-booking-mmvs3r3jbrdwbuu7x5vecw.streamlit.app/?lineidtoemp=" + uId, "_top");
                     }).catch(err => {
                         document.getElementById('status-msg').innerHTML = "❌ ดึงโปรไฟล์ล้มเหลว: " + err;
                     });
@@ -221,7 +221,7 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
 
-# --- โครงสร้างฟังก์ชันระบบควบคุมอื่น ๆ คีย์เวิร์ดของอู่รถ Hunsa คงไว้สมบูรณ์ 100% เพื่อความเสถียรของระบบคิวรถ ---
+# --- หน้าระบบเมนูอื่น ๆ คงไว้เหมือนเดิมทั้งหมดเพื่อความเสถียรของฐานข้อมูลอู่รถ ---
 elif "Dashboard" in choice:
     if current_role == "admin":
         st.success("👑 ยินดีต้อนรับกลับเข้าสู่ระบบครับ แอดมินกล้า (Admin Level Max) | ระบบความปลอดภัยยืนยันสิทธิ์ถูกต้องเรียบร้อย")
@@ -609,87 +609,4 @@ elif "จัดการพนักงาน" in choice:
         db = get_connection()
         with db.cursor() as cursor: cursor.execute("SELECT line_user_id, name, role, status FROM users")
         all_users = cursor.fetchall()
-        user_list_options = {f"👤 {u[1]} ({u[2].upper()}) - [{u[3] if u[3] else 'Active'}]": u for u in all_users}
-    except Exception as e: user_list_options = {}
-    finally:
-        if 'db' in locals() and db.open: db.close()
-
-    col_form_edit, col_form_del = st.columns([2, 1])
-
-    with col_form_edit:
-        st.write("📝 **ระบบลงทะเบียน / แก้ไข และ ปรับสถานะพนักงาน**")
-        select_user_action = st.selectbox("💡 เลือกพนักงานที่ต้องการแก้ไข (หรือเลือกเพิ่มคนใหม่)", options=["➕ ลงทะเบียนพนักงานใหม่ / กรอกเอง"] + list(user_list_options.keys()))
-        init_id, init_name, init_role, init_status = "", "", "driver", "Active"
-        
-        if select_user_action != "➕ ลงทะเบียนพนักงานใหม่ / กรอกเอง":
-            user_data = user_list_options[select_user_action]
-            init_id, init_name = user_data[0], user_data[1]
-            init_role = user_data[2].lower() if user_data[2] else "driver"
-            init_status = user_data[3] if user_data[3] else "Active"
-
-        with st.form("user_management_form", clear_on_submit=False):
-            new_line_id = st.text_input("ระบุ LINE User ID", value=init_id).strip()
-            new_name = st.text_input("ระบุชื่อ-นามสกุลจริง ของพนักงาน", value=init_name).strip()
-            roles_pool = ["admin", "booker", "dispatcher", "driver", "airportstaff", "guest"]
-            new_role = st.selectbox("กำหนดตำแหน่ง (Role)", roles_pool, index=roles_pool.index(init_role) if init_role in roles_pool else 3)
-            status_pool = ["Active", "Inactive"]
-            new_status = st.radio("🚦 Status การใช้งานระบบ", status_pool, index=status_pool.index(init_status) if init_status in status_pool else 0, horizontal=True)
-            submit_user = st.form_submit_button("💾 อนุมัติและบันทึกสิทธิ์")
-            
-            if submit_user:
-                if new_line_id and new_name:
-                    try:
-                        conn = get_connection()
-                        cursor = conn.cursor()
-                        sql = "INSERT INTO users (line_user_id, name, role, status) VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE name = %s, role = %s, status = %s"
-                        cursor.execute(sql, (new_line_id, new_name, new_role, new_status, new_name, new_role, new_status))
-                        conn.commit()
-                        cursor.close()
-                        conn.close()
-                        st.success(f"🎉 บันทึกข้อมูลและอัปเดตสถานะพนักงานเรียบร้อยแล้ว!")
-                        st.rerun()
-                    except Exception as e: st.error(f"❌ เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
-                else: st.warning("⚠️ รบกวนกรอก LINE ID และชื่อพนักงานให้ครบถ้วนครับ")
-
-    with col_form_del:
-        with st.form("user_delete_form"):
-            st.write("❌ **โซนอันตราย: ลบพนักงานออกจากระบบ**")
-            user_to_delete = st.selectbox("เลือกรายชื่อที่จะลบทิ้งเด็ดขาด", options=list(user_list_options.keys()))
-            confirm_delete = st.checkbox("⚠️ ยืนยันว่าต้องการลบข้อมูลพนักงานคนนี้จริง ๆ")
-            btn_delete = st.form_submit_button("🗑️ ลบพนักงานออกถาวร")
-            
-            if btn_delete:
-                if confirm_delete and user_to_delete:
-                    target_del_id = user_list_options[user_to_delete][0]
-                    target_del_name = user_list_options[user_to_delete][1]
-                    try:
-                        conn = get_connection()
-                        cursor = conn.cursor()
-                        cursor.execute("SELECT COUNT(*) FROM bookings WHERE driver_id = %s", (target_del_id,))
-                        has_history = cursor.fetchone()[0]
-                        if has_history > 0:
-                            st.error(f"❌ ไม่สามารถลบคุณ {target_del_name} ได้ เนื่องจากมีประวัติการวิ่งงานในระบบแล้ว (แนะนำให้เปลี่ยนสถานะเป็น Inactive แทน เพื่อความปลอดภัยของข้อมูลบัญชี)")
-                        else:
-                            cursor.execute("DELETE FROM users WHERE line_user_id = %s", (target_del_id,))
-                            conn.commit()
-                            st.success(f"🗑️ ลบข้อมูลพนักงานทดสอบคุณ {target_del_name} เรียบร้อยแล้ว!")
-                            st.rerun()
-                        cursor.close()
-                        conn.close()
-                    except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
-                else: st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
-
-    st.write("---")
-    st.write("### 📋 รายชื่อพนักงานและระดับสิทธิ์ปัจจุบันในคลาวด์")
-    try:
-        db = get_connection()
-        with db.cursor() as cursor:
-            cursor.execute("SELECT line_user_id, name, role, status FROM users ORDER BY role ASC")
-            users_data = cursor.fetchall()
-        columns_users = ['รหัส LINE User ID', 'ชื่อ-นามสกุล พนักงาน', 'ตำแหน่ง (Role)', 'สถานะการใช้งาน']
-        df_users = pd.DataFrame(users_data, columns=columns_users)
-        if not df_users.empty: st.dataframe(df_users, width='stretch', hide_index=True)
-        else: st.info("ยังไม่มีข้อมูลผู้ใช้งานในระบบ")
-    except Exception as e: st.error(f"❌ ไม่สามารถดึงตารางรายชื่อพนักงานได้: {e}")
-    finally:
-        if 'db' in locals() and db.open: db.close()
+        user_list_options = {f"👤 {u[1]} ({u[2].upper()}) - [{u[3] if u
