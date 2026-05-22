@@ -30,12 +30,11 @@ def send_line_message(message, target_id):
     except Exception as e:
         st.sidebar.error(f"❌ ระบบส่ง LINE ขัดข้อง: {e}")
 
-# --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน (เวอร์ชันเปิดสิทธิ์ทางลัดริชเมนู) ---
+# --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน ---
 def check_permission(user_id, line_name=None):
     if not user_id or user_id.strip() == "" or user_id.strip().lower() == "none" or user_id.startswith("GUEST_") or "line.me" in user_id.lower() or "http" in user_id.lower() or "*" in user_id:
         return "guest"
         
-    # ระบบ Bypass สิทธิ์พิเศษสำหรับปุ่มทดสอบระบบทางลัดของแอดมิน
     if user_id == "admin01":
         return "admin"
     elif user_id == "booker01":
@@ -93,7 +92,6 @@ st.markdown("""
 if "default_user_id" not in st.session_state:
     st.session_state["default_user_id"] = ""
 
-# 📌 🧠 [เปิดท่อคู่ขนานอเนกประสงค์] รองรับทั้ง ?lineidtoemp= ปุ่มเขียว และ ?user= ทางลัดริชเมนูของแอดมิน
 query_params = st.query_params
 extracted_id = ""
 
@@ -102,7 +100,6 @@ if "lineidtoemp" in query_params:
     if "*" not in raw_val and len(raw_val) > 15:
         extracted_id = raw_val
 elif "user" in query_params:
-    # ท่อพิเศษดักรับปุ่มริชเมนูเทส A, B, C, D, E ของแอดมินกล้า
     raw_user = query_params["user"].strip()
     if "*" not in raw_user:
         extracted_id = raw_user
@@ -142,6 +139,7 @@ elif current_role in ["airportstaff", "airport staff"]:
 else:
     menu_options = ["📝 ลงทะเบียนพนักงานใหม่"]
 
+# 📌 🧠 [จุดแก้ไขเพิ่มความเสถียร] ล้างค่าเมนูเอ๋อค้างเก่าออก หากเปลี่ยนกลุ่มสิทธิ์ผู้ใช้งาน
 if "current_menu_choice" not in st.session_state or st.session_state["current_menu_choice"] not in menu_options:
     st.session_state["current_menu_choice"] = menu_options[0] if menu_options else ""
 
@@ -259,7 +257,6 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
 
-# --- โครงสร้างหน้าระบบการทำงานเมนูอื่น ๆ คงไว้เหมือนเดิมทั้งหมดเพื่อความเสถียรของฐานข้อมูลอู่รถ ---
 elif "Dashboard" in choice:
     if current_role == "admin":
         st.success("👑 ยินดีต้อนรับกลับเข้าสู่ระบบครับ แอดมินกล้า (Admin Level Max) | ระบบความปลอดภัยยืนยันสิทธิ์ถูกต้องเรียบร้อย")
@@ -434,7 +431,7 @@ elif "Dispatcher" in choice:
             st.write("### 📊 ตารางสถานะงานปัจจุบัน (กำลังรอรับ/กำลังเดินทาง)")
             st.dataframe(df_display, width='stretch', hide_index=True, column_config={"id": None})
         else:
-            st.info("✨ 沒有งานค้างในระบบปัจจุบัน")
+            st.info("✨ 没有งานค้างในระบบปัจจุบัน")
     except Exception as e:
         st.error(f"เกิดข้อผิดพลาดในการดึงตารางงาน: {e}")
     finally:
@@ -466,7 +463,7 @@ elif "Dispatcher" in choice:
                     cursor.execute("SELECT voucher_no, passenger_name, status, driver_id FROM bookings WHERE id = %s", (job_id_to_update,))
                     old_job_data = cursor.fetchone()
                     
-                    cursor.execute("UPDATE bookings SET driver_id = %s, status = 'Assigned' WHERE id = %s", (driver_id_target, job_id_to_update))
+                    cursor.execute("UPDATE bookings SET driver_id = %s, status = 'Assigned' WHERE id = %s", (job_id_to_update,))
                     conn.commit()
                     cursor.close()
                     conn.close()
@@ -674,7 +671,7 @@ elif "จัดการพนักงาน" in choice:
             new_role = st.selectbox("กำหนดตำแหน่ง (Role)", roles_pool, index=roles_pool.index(init_role) if init_role in roles_pool else 3)
             status_pool = ["Active", "Inactive"]
             new_status = st.radio("🚦 Status การใช้งานระบบ", status_pool, index=status_pool.index(init_status) if init_status in status_pool else 0, horizontal=True)
-            submit_user = st.form_submit_button("💾 อนุมัติและบันทึกสิทธิ์")
+            submit_user = st.form_submit_button("💾 อนุมัติและบันทิทธิ์")
             
             if submit_user:
                 if new_line_id and new_name:
@@ -696,40 +693,4 @@ elif "จัดการพนักงาน" in choice:
             st.write("❌ **โซนอันตราย: ลบพนักงานออกจากระบบ**")
             user_to_delete = st.selectbox("เลือกรายชื่อที่จะลบทิ้งเด็ดขาด", options=list(user_list_options.keys()))
             confirm_delete = st.checkbox("⚠️ ยืนยันว่าต้องการลบข้อมูลพนักงานคนนี้จริง ๆ")
-            btn_delete = st.form_submit_button("🗑️ ลบพนักงานออกถาวร")
-            
-            if btn_delete:
-                if confirm_delete and user_to_delete:
-                    target_del_id = user_list_options[user_to_delete][0]
-                    target_del_name = user_list_options[user_to_delete][1]
-                    try:
-                        conn = get_connection()
-                        cursor = conn.cursor()
-                        cursor.execute("SELECT COUNT(*) FROM bookings WHERE driver_id = %s", (target_del_id,))
-                        has_history = cursor.fetchone()[0]
-                        if has_history > 0:
-                            st.error(f"❌ ไม่สามารถลบคุณ {target_del_name} ได้ เนื่องจากมีประวัติการวิ่งงานในระบบแล้ว (แนะนำให้เปลี่ยนสถานะเป็น Inactive แทน เพื่อความปลอดภัยของข้อมูลบัญชี)")
-                        else:
-                            cursor.execute("DELETE FROM users WHERE line_user_id = %s", (target_del_id,))
-                            conn.commit()
-                            st.success(f"🗑️ ลบข้อมูลพนักงานทดสอบคุณ {target_del_name} เรียบร้อยแล้ว!")
-                            st.rerun()
-                        cursor.close()
-                        conn.close()
-                    except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
-                else: st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
-
-    st.write("---")
-    st.write("### 📋 รายชื่อพนักงานและระดับสิทธิ์ปัจจุบันในคลาวด์")
-    try:
-        db = get_connection()
-        with db.cursor() as cursor:
-            cursor.execute("SELECT line_user_id, name, role, status FROM users ORDER BY role ASC")
-            users_data = cursor.fetchall()
-        columns_users = ['รหัส LINE User ID', 'ชื่อ-นามสกุล พนักงาน', 'ตำแหน่ง (Role)', 'สถานะการใช้งาน']
-        df_users = pd.DataFrame(users_data, columns=columns_users)
-        if not df_users.empty: st.dataframe(df_users, width='stretch', hide_index=True)
-        else: st.info("ยังไม่มีข้อมูลผู้ใช้งานในระบบ")
-    except Exception as e: st.error(f"❌ ไม่สามารถดึงตารางรายชื่อพนักงานได้: {e}")
-    finally:
-        if 'db' in locals() and db.open: db.close()
+            st.form_submit_button("🗑️ ลบพนักงานออกถาวร")
