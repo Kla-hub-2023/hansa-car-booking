@@ -35,7 +35,6 @@ def check_permission(user_id, line_name=None):
     if not user_id or user_id.strip() == "" or user_id.strip().lower() == "none" or user_id.startswith("GUEST_") or "line.me" in user_id.lower() or "http" in user_id.lower() or "*" in user_id:
         return "guest"
         
-    # ล้างค่าการสะกดตัวพิมพ์ให้เป็นมาตรฐานพิมพ์เล็กทั้งหมด ดักจับปุ่มริชเมนูแอดมินได้แม่นยำ
     uid_clean = user_id.strip().lower()
     if uid_clean == "admin01":
         return "admin"
@@ -137,14 +136,31 @@ elif current_role == "booker":
 elif current_role == "dispatcher":
     menu_options = ["🖥️ Dispatcher"]
 elif current_role == "driver":
-    menu_options = ["🚖 งานของฉัน (Driver)"]
+    menu_options = ["𚖖 งานของฉัน (Driver)"]
 elif current_role in ["airportstaff", "airport staff"]:
     menu_options = ["✈️ Airport Staff"]
 else:
     menu_options = ["📝 ลงทะเบียนพนักงานใหม่"]
 
+# 📌 🧠 [จุดปรับปรุงเชิงรุก 🎯] ล้างค่าเมนูเอ๋อค้างเก่า และล็อกเมนูปปลายทางตามใจแอดมินกล้าทันที
 if "current_menu_choice" not in st.session_state or st.session_state["current_menu_choice"] not in menu_options:
     st.session_state["current_menu_choice"] = menu_options[0] if menu_options else ""
+
+# 🚀 ทริคเปลี่ยนหน้าวาร์ปออโต้เมื่อแอดมินกล้ากดผ่านริชเมนูตัวอักษรลับข้ามสิทธิ์มา
+if current_role == "admin" and "menu_forced" not in st.session_state:
+    if "lineidtoemp" in query_params:
+        # กรณีแอดมินจำลองสแกนรหัสลิฟต์ ให้แช่ไว้หน้าฟอร์ม
+        st.session_state["current_menu_choice"] = "📝 ลงทะเบียนพนักงานใหม่"
+    elif "user" in query_params:
+        val_user = query_params["user"].strip().lower()
+        if val_user == "admin01" and "id" in query_params: # ถ้าเป็นลิงก์ช่อง F เก่าที่แอดมินเคยแนบ
+            st.session_state["current_menu_choice"] = "👥 จัดการพนักงาน"
+        elif val_user == "driver01":
+            st.session_state["current_menu_choice"] = "𚖖 งานของฉัน (Driver)"
+        elif val_user in ["staff01", "airportstaff01"]:
+            st.session_state["current_menu_choice"] = "✈️ Airport Staff"
+        elif val_user == "admin01":
+            st.session_state["current_menu_choice"] = "🏠 Dashboard"
 
 choice = st.sidebar.radio(
     "เมนูใช้งาน", 
@@ -153,7 +169,7 @@ choice = st.sidebar.radio(
 )
 
 # --- 4. การแสดงเนื้อหาไส้ในของแต่ละเมนูตามหน้าเลือก ---
-if "ลงทะเบียนพนักงานใหม่" in choice:
+if choice == "📝 ลงทะเบียนพนักงานใหม่":
     st.title("📝 ฟอร์มรายงานตัวและลงทะเบียนพนักงานใหม่")
     st.warning("⚠️ บัญชีของคุณกำลังรอแอดมินอนุมัติสิทธิ์เข้าใช้งานระบบคิวรถครับ")
     st.write("---")
@@ -260,7 +276,7 @@ if "ลงทะเบียนพนักงานใหม่" in choice:
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
 
-elif "Dashboard" in choice:
+elif choice == "🏠 Dashboard":
     if current_role == "admin":
         st.success("👑 ยินดีต้อนรับกลับเข้าสู่ระบบครับ แอดมินกล้า (Admin Level Max) | ระบบความปลอดภัยยืนยันสิทธิ์ถูกต้องเรียบร้อย")
 
@@ -312,7 +328,7 @@ elif "Dashboard" in choice:
                 "* **driver01** : ดูงานของตัวเองและกดรับงาน\n"
                 "* **driver02** : ดูงานของคนขับคนที่ 2")
 
-elif "Booker" in choice:
+elif choice == "➕ Booker":
     st.title("📋 แบบฟอร์มจองรถ (Booker)")
     st.subheader("กรอกรายละเอียดการเดินทางเพื่อส่งงานให้ผู้จัดสรรรถ")
 
@@ -394,7 +410,7 @@ elif "Booker" in choice:
         if 'db' in locals() and db.open:
             db.close()
 
-elif "Dispatcher" in choice:
+elif choice == "🖥️ Dispatcher":
     st.title("🎛️ แผงควบคุมสำหรับ Dispatcher")
     st.write("---")
     
@@ -509,7 +525,7 @@ elif "Dispatcher" in choice:
         else:
             st.info("ไม่มีรายการงานในระบบ")
 
-elif "driver" in choice:
+elif choice == "🚖 งานของฉัน (Driver)":
     st.title("𚖖 งานที่ได้รับมอบหมาย (Driver)")
     driver_name = "ไม่ระบุชื่อ"
     try:
@@ -580,7 +596,7 @@ elif "driver" in choice:
                     except Exception as e: st.error(f"❌ ไม่สามารถเปลี่ยนสถานะงานได้: {e}")
                     finally:
                         if 'db' in locals() and db.open: db.close()
-    else: st.success("✨ ไม่มีงานปัจจุบันค้างอยู่")
+    else: st.success("✨ 沒有งานปัจจุบันค้างอยู่")
 
     st.write("---")
     st.write("### ✅ ประวัติการวิ่งงานที่เสร็จสิ้นแล้ว (Completed)")
@@ -589,7 +605,7 @@ elif "driver" in choice:
         st.dataframe(df_driver_history, width='stretch', hide_index=True)
     else: st.info("ℹ️ ยังไม่มีประวัติงานที่บันทึกสถานะเสร็จสิ้น")
 
-elif "airportstaff" in choice or "airport staff" in choice:
+elif choice == "✈️ Airport Staff":
     st.title("✈️ ตรวจสอบสถานะรถ (Airport Staff)")
     st.subheader("📋 ตารางมอนิเตอร์รถยนต์และคนขับที่กำลังปฏิบัติงาน")
 
@@ -623,7 +639,7 @@ elif "airportstaff" in choice or "airport staff" in choice:
         with col_metrics2: st.metric(label="✅ จำนวนรถที่คนขับกดรับงานแล้ว (Accepted)", value=len(df_airport[df_airport['สถานะงาน'] == 'Accepted']))
     else: st.info("ℹ️ ปัจจุบันยังไม่มีรถยนต์คันไหนกำลังเดินทางมาสนามบิน")
 
-elif "จัดการพนักงาน" in choice:
+elif choice == "👥 จัดการพนักงาน":
     st.title("👥 ระบบจัดการสิทธิ์ผู้ใช้งาน (User Management)")
     st.write("---")
     
@@ -718,3 +734,18 @@ elif "จัดการพนักงาน" in choice:
                         conn.close()
                     except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
                 else: st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
+
+    st.write("---")
+    st.write("### 📋 รายชื่อพนักงานและระดับสิทธิ์ปัจจุบันในคลาวด์")
+    try:
+        db = get_connection()
+        with db.cursor() as cursor:
+            cursor.execute("SELECT line_user_id, name, role, status FROM users ORDER BY role ASC")
+            users_data = cursor.fetchall()
+        columns_users = ['รหัส LINE User ID', 'ชื่อ-นามสกุล พนักงาน', 'ตำแหน่ง (Role)', 'สถานะการใช้งาน']
+        df_users = pd.DataFrame(users_data, columns=columns_users)
+        if not df_users.empty: st.dataframe(df_users, width='stretch', hide_index=True)
+        else: st.info("ยังไม่มีข้อมูลผู้ใช้งานในระบบ")
+    except Exception as e: st.error(f"❌ ไม่สามารถดึงตารางรายชื่อพนักงานได้: {e}")
+    finally:
+        if 'db' in locals() and db.open: db.close()
