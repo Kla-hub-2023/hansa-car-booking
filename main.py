@@ -277,11 +277,14 @@ if choice == "📝 ลงทะเบียนพนักงานใหม่"
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
 
+# --- ปรับแก้ท่อน Dashboard ---
 elif choice == "🏠 Dashboard":
+    # ลบข้อความยินดีต้อนรับออกตามสั่ง
     st.title("🏠 หน้าแรกและภาพรวมระบบ (Dashboard)")
-    st.markdown(f"สวัสดีครับแอดมิน Status การเชื่อมต่อ **ระบบปกติดีเยี่ยม** ครับ")
+    st.markdown(f"สวัสดีครับแอดมิน สถานะการเชื่อมต่อ **ระบบปกติดีเยี่ยม** ครับ")
     st.write("---")
 
+    # 1. ส่วนแสดง Metric สรุปงาน
     try:
         db = get_connection()
         with db.cursor() as cursor:
@@ -291,40 +294,64 @@ elif choice == "🏠 Dashboard":
             count_active = cursor.fetchone()[0]
             cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'driver'")
             count_drivers = cursor.fetchone()[0]
+            
+            # ดึงข้อมูลล่าสุดมาแสดง
             cursor.execute("SELECT id, voucher_no, passenger_name, pickup_location, dropoff_location, status FROM bookings ORDER BY id DESC LIMIT 5")
             recent_data = cursor.fetchall()
+            
+            # ดึงรายชื่อพนักงานมาแสดงเพิ่มในหน้า Dashboard สำหรับ Admin
+            cursor.execute("SELECT line_user_id, name, role, status FROM users ORDER BY role ASC")
+            users_data = cursor.fetchall()
+            
         df_recent = pd.DataFrame(recent_data, columns=['ใบงานที่', 'เลข Voucher', 'ชื่อผู้โดยสาร', 'จุดรับ', 'จุดส่ง', 'สถานะ'])
+        df_users = pd.DataFrame(users_data, columns=['LINE User ID', 'ชื่อ-นามสกุล', 'ตำแหน่ง', 'สถานะ'])
     except Exception as e:
         count_pending, count_active, count_drivers = 0, 0, 0
         df_recent = pd.DataFrame()
+        df_users = pd.DataFrame()
     finally:
-        if 'db' in locals() and db.open:
-            db.close()
+        if 'db' in locals() and db.open: db.close()
 
     col_m1, col_m2, col_m3 = st.columns(3)
     with col_m1:
-        st.metric(label="⏳ ใบงานรอจัดสรร (Pending)", value=count_pending, delta=f"{count_pending} งานค้าง", delta_color="inverse" if count_pending > 0 else "normal")
+        st.metric(label="⏳ งานรอจัดสรร", value=count_pending)
     with col_m2:
-        st.metric(label="🚀 รถกำลังปฏิบัติงาน (Active)", value=count_active)
+        st.metric(label="🚀 รถกำลังวิ่ง", value=count_active)
     with col_m3:
-        st.metric(label="🚖 คนขับรถในระบบทั้งหมด", value=count_drivers)
+        st.metric(label="🚖 คนขับทั้งหมด", value=count_drivers)
 
     st.write("---")
-    col_left, col_right = st.columns([2, 1])
     
-    with col_left:
-        st.write("### ⏱️ รายการจองรถล่าสุด 5 รายการ")
-        if not df_recent.empty:
-            st.dataframe(df_recent, width='stretch', hide_index=True)
-        else:
-            st.info("ยังไม่มีประวัติการจองในระบบ")
-            
-    with col_right:
-        st.write("### 💡 แนะนำการใช้งาน")
-        st.info("แอดมินสามารถสลับบัญชีเพื่อทดสอบระบบได้:\n\n"
-                "* **admin01** : จัดสรรงานและดูภาพรวมทั้งหมด\n"
-                "* **driver01** : ดูงานของตัวเองและกดรับงาน\n"
-                "* **driver02** : ดูงานของคนขับคนที่ 2")
+    # 2. เพิ่มตารางจัดการพนักงานเข้ามาในหน้า Dashboard เลย
+    if current_role == "admin":
+        st.write("### 👥 ระบบจัดการสิทธิ์พนักงาน (Quick Access)")
+        st.dataframe(df_users, width='stretch', hide_index=True)
+        
+        with st.expander("➕ เพิ่ม/แก้ไขสิทธิ์พนักงาน (คลิกเพื่อขยาย)"):
+            with st.form("quick_user_mgmt"):
+                new_line_id = st.text_input("LINE User ID").strip()
+                new_name = st.text_input("ชื่อ-นามสกุล").strip()
+                new_role = st.selectbox("ตำแหน่ง", ["admin", "booker", "dispatcher", "driver", "airportstaff", "guest"])
+                new_status = st.radio("สถานะ", ["Active", "Inactive"], horizontal=True)
+                
+                if st.form_submit_button("💾 บันทึกสิทธิ์"):
+                    try:
+                        conn = get_connection()
+                        cursor = conn.cursor()
+                        sql = "INSERT INTO users (line_user_id, name, role, status) VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE name = %s, role = %s, status = %s"
+                        cursor.execute(sql, (new_line_id, new_name, new_role, new_status, new_name, new_role, new_status))
+                        conn.commit()
+                        st.success("บันทึกเรียบร้อย!")
+                        st.rerun()
+                    except Exception as e: st.error(f"Error: {e}")
+                    finally: conn.close()
+
+    st.write("---")
+    st.write("### ⏱️ รายการจองรถล่าสุด 5 รายการ")
+    if not df_recent.empty:
+        st.dataframe(df_recent, width='stretch', hide_index=True)
+    else:
+        st.info("ยังไม่มีประวัติการจองในระบบ")
 
 elif choice == "➕ Booker":
     st.title("📋 แบบฟอร์มจองรถ (Booker)")
