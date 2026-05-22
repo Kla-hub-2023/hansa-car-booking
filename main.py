@@ -84,21 +84,47 @@ st.markdown("""
 if "default_user_id" not in st.session_state:
     st.session_state["default_user_id"] = ""
 
-# 🚀 [มหาเวทย์แกะรหัสล็อก] ดักสแกนพารามิเตอร์ URL ทุกมิติ ทั้งแบบตรงและแบบเข้ารหัส liff.state ของแอป LINE
+# ==============================================================================
+# 🚀 [ท่อนปรับปรุง] ตรวจสอบและพ่นค่าพารามิเตอร์ดิบจาก LINE โชว์หน้าแอป
+# ==============================================================================
 query_params = st.query_params
 extracted_id = ""
 
+# 📌 1. สร้างกล่อง Message ส่องค่าดิบทั้งหมดที่วิ่งเข้ามาใน URL (DEBUG ZONE)
+st.write("### 🛠️ กล่องส่องค่าพารามิเตอร์ดิบจาก LINE (Debug)")
+
+# เช็กค่าพารามิเตอร์ 'user'
+if "user" in query_params:
+    st.info(f"📬 ตรวจพบตัวแปร `?user=` ค่าดิบคือ: **{query_params['user']}**")
+else:
+    st.write("❌ ไม่พบตัวแปร `?user=` วิ่งเข้ามาใน URL")
+
+# เช็กค่าพารามิเตอร์ 'liff.state'
+if "liff.state" in query_params:
+    st.info(f"📦 ตรวจพบตัวแปร `?liff.state=` ค่าดิบคือ: **{query_params['liff.state']}**")
+else:
+    st.write("❌ ไม่พบตัวแปร `?liff.state=` วิ่งเข้ามาใน URL")
+
+
+# 📌 2. รันระบบแกะรหัสลับเพื่อหา LINE User ID (ตัว U) ตามปกติ
 if "user" in query_params:
     extracted_id = query_params["user"].strip()
 elif "liff.state" in query_params:
-    # ทริคเด็ด: เจาะเข้าท่อเข้ารหัสลับของ LINE เพื่อแกะคำว่า user= ออกมาจากท่อ liff.state
     raw_state = query_params["liff.state"].strip()
     if "user=" in raw_state:
         extracted_id = raw_state.split("user=")[-1].split("&")[0].strip()
     elif "%3Fuser%3D" in raw_state:
         extracted_id = raw_state.split("%3Fuser%3D")[-1].split("%26")[0].strip()
 
-# คัดกรองความสะอาดของรหัสก่อนยัดเข้าฟอร์ม
+# 📌 3. แสดงผลลัพธ์ที่แกะได้เสร็จสรรพ
+if extracted_id:
+    st.success(f"🎯 รหัสตัว U ที่ระบบแกะออกมาได้สำเร็จ: **{extracted_id}**")
+else:
+    st.warning("⚠️ ระบบยังไม่สามารถแกะรหัส LINE User ID (ตัว U) จากตัวแปรใด ๆ ได้")
+st.write("---")
+
+
+# 📌 4. ส่งค่าเข้าฟอร์มและจัดการสิทธิ์ (เหมือนเดิม)
 if extracted_id and "http" not in extracted_id.lower() and "line.me" not in extracted_id.lower() and len(extracted_id) > 10:
     st.session_state.default_user_id = extracted_id
 
@@ -120,6 +146,7 @@ st.sidebar.info(f"สิทธิ์ของคุณคือ: {user_role}")
 # --- 3. จัดการรายการเมนูฝั่งซ้ายตามระดับสิทธิ์ ---
 menu_options = []
 current_role = user_role.strip().lower()
+# ==============================================================================
 
 if current_role == "admin":
     menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "👥 จัดการพนักงาน", "🚖 งานของฉัน (Driver)", "✈️ Airport Staff"]
