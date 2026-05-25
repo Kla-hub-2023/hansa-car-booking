@@ -99,30 +99,52 @@ if choice == "🏠 Dashboard":
             st.write("### 👥 ระบบจัดการสิทธิ์พนักงาน (Quick Access)")
             st.dataframe(df_users, width='stretch', hide_index=True)
             
-            # ทำ Selectbox เลือกรายชื่อมาแก้ไข
-            user_options = {f"{row['ชื่อ-นามสกุล']} ({row['LINE User ID']})": row for _, row in df_users.iterrows()}
-            selected_user = st.selectbox("เลือกพนักงานเพื่อแก้ไขข้อมูล", ["-- เลือกพนักงาน --"] + list(user_options.keys()))
-            
-            # ค่าเริ่มต้น
-            def_id, def_name, def_role, def_status = "", "", "driver", "Active"
-            if selected_user != "-- เลือกพนักงาน --":
-                u = user_options[selected_user]
-                def_id, def_name, def_role, def_status = u['LINE User ID'], u['ชื่อ-นามสกุล'], u['ตำแหน่ง'], u['สถานะ']
+            # แก้ไข: ตรวจสอบก่อนว่าข้อมูลใน DataFrame ไม่ว่าง
+            if not df_users.empty:
+                # สร้าง Dictionary สำหรับ Selectbox โดยให้ Key เป็นชื่อ + ID
+                # และ Value เป็น Dictionary ข้อมูลของแถวนั้นๆ
+                user_options = {f"{row['ชื่อ-นามสกุล']} ({row['LINE User ID']})": row for _, row in df_users.iterrows()}
+                
+                selected_user = st.selectbox("เลือกรายชื่อพนักงานเพื่อแก้ไขข้อมูล", ["-- เลือกพนักงาน --"] + list(user_options.keys()))
+                
+                # กำหนดค่าเริ่มต้น
+                def_id, def_name, def_role, def_status = "", "", "driver", "Active"
+                
+                if selected_user != "-- เลือกพนักงาน --":
+                    u = user_options[selected_user]
+                    def_id = str(u['LINE User ID'])
+                    def_name = str(u['ชื่อ-นามสกุล'])
+                    def_role = str(u['ตำแหน่ง']).lower()
+                    def_status = str(u['สถานะ'])
 
-            with st.expander("➕ เพิ่ม/แก้ไขสิทธิ์พนักงาน"):
-                with st.form("quick_user_mgmt"):
-                    e_id = st.text_input("LINE User ID", value=def_id)
-                    e_name = st.text_input("ชื่อ-นามสกุล", value=def_name)
-                    e_role = st.selectbox("ตำแหน่ง", ["admin", "booker", "dispatcher", "driver", "airportstaff", "guest"], 
-                                          index=["admin", "booker", "dispatcher", "driver", "airportstaff", "guest"].index(def_role) if def_role in ["admin", "booker", "dispatcher", "driver", "airportstaff", "guest"] else 3)
-                    e_status = st.radio("สถานะ", ["Active", "Inactive"], index=0 if def_status=="Active" else 1, horizontal=True)
-                    
-                    if st.form_submit_button("💾 บันทึกสิทธิ์"):
-                        cursor.execute("INSERT INTO users VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE name=%s, role=%s, status=%s", 
-                                       (e_id, e_name, e_role, e_status, e_name, e_role, e_status))
-                        db.commit()
-                        st.success("บันทึกเรียบร้อย!")
-                        st.rerun()
+                with st.expander("➕ เพิ่ม/แก้ไขสิทธิ์พนักงาน"):
+                    with st.form("quick_user_mgmt", clear_on_submit=False):
+                        e_id = st.text_input("LINE User ID", value=def_id)
+                        e_name = st.text_input("ชื่อ-นามสกุล", value=def_name)
+                        
+                        roles_list = ["admin", "booker", "dispatcher", "driver", "airportstaff", "guest"]
+                        # ตรวจสอบ index ให้ปลอดภัย
+                        try:
+                            r_index = roles_list.index(def_role)
+                        except ValueError:
+                            r_index = 3 # ถ้าไม่เจอให้ไปที่ driver
+                        
+                        e_role = st.selectbox("ตำแหน่ง", roles_list, index=r_index)
+                        e_status = st.radio("สถานะ", ["Active", "Inactive"], index=0 if def_status=="Active" else 1, horizontal=True)
+                        
+                        if st.form_submit_button("💾 บันทึกสิทธิ์"):
+                            if e_id and e_name:
+                                cursor.execute("""INSERT INTO users (line_user_id, name, role, status) 
+                                                VALUES (%s, %s, %s, %s) 
+                                                ON DUPLICATE KEY UPDATE name=%s, role=%s, status=%s""", 
+                                               (e_id, e_name, e_role, e_status, e_name, e_role, e_status))
+                                db.commit()
+                                st.success("บันทึกเรียบร้อย!")
+                                st.rerun()
+                            else:
+                                st.error("กรุณากรอก LINE User ID และชื่อ-นามสกุลให้ครบครับ")
+            else:
+                st.info("ยังไม่มีข้อมูลพนักงานในระบบครับ")
 
         st.write("---")
         st.write("### ⏱️ รายการจองรถล่าสุด 5 รายการ")
