@@ -56,7 +56,7 @@ menu_options = []
 if user_role == "admin": menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "𚖖 งานของฉัน (Driver)", "✈️ Airport Staff"]
 elif user_role == "booker": menu_options = ["➕ Booker"]
 elif user_role == "dispatcher": menu_options = ["🖥️ Dispatcher"]
-elif user_role == "driver": menu_options = ["𚖖 งานของฉัน (Driver)"]
+elif user_role == "driver": menu_options = ["🚖 งานของฉัน (Driver)"]
 elif user_role == "airportstaff": menu_options = ["✈️ Airport Staff"]
 else: menu_options = ["📝 ลงทะเบียนพนักงานใหม่"]
 
