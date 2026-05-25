@@ -5,11 +5,22 @@ import requests
 import datetime as dt_module
 import streamlit.components.v1 as components
 
+# --- 1. เชื่อมต่อฐานข้อมูล ---
 def get_connection():
-    return pymysql.connect(host='mysql-22653bef-kla-e55d.c.aivencloud.com', user='avnadmin', password='AVNS_W4Huwc3abQww6NKNlG2', database='defaultdb', port=23986)
+    return pymysql.connect(
+        host='mysql-22653bef-kla-e55d.c.aivencloud.com',
+        user='avnadmin',
+        password='AVNS_W4Huwc3abQww6NKNlG2',
+        database='defaultdb',
+        port=23986
+    )
 
+# --- 2. ฟังก์ชันตรวจสอบสิทธิ์ ---
 def check_permission(user_id):
     if not user_id or user_id.startswith("GUEST_") or "*" in user_id: return "guest"
+    uid = user_id.strip().lower()
+    mapping = {"admin01": "admin", "booker01": "booker", "dispatcher01": "dispatcher", "driver01": "driver", "staff01": "airportstaff", "airportstaff01": "airportstaff"}
+    if uid in mapping: return mapping[uid]
     try:
         db = get_connection()
         with db.cursor() as cursor:
@@ -17,10 +28,12 @@ def check_permission(user_id):
             res = cursor.fetchone()
             if res and res[1] == "Active": return str(res[0]).lower()
             return "guest"
+    except: return "guest"
     finally: db.close()
 
 st.set_page_config(page_title="ระบบจัดการรถ Hunsa", layout="wide")
 
+# --- 3. จัดการสถานะและเมนู ---
 query_params = st.query_params
 if "lineidtoemp" in query_params: st.session_state.default_user_id = query_params["lineidtoemp"].strip()
 elif "user" in query_params: st.session_state.default_user_id = query_params["user"].strip()
@@ -30,20 +43,20 @@ st.session_state.default_user_id = current_id
 user_role = check_permission(current_id)
 st.sidebar.info(f"สิทธิ์: {user_role.upper()}")
 
-# แก้ตรงนี้ครับ
-if user_role == "admin": 
-    menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "🚖 งานของฉัน (Driver)", "✈️ Airport Staff"]
-if "current_menu_choice" not in st.session_state: st.session_state["current_menu_choice"] = menu_options[0]
+menu_options = []
+if user_role == "admin": menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "🚖 งานของฉัน (Driver)", "✈️ Airport Staff"]
+elif user_role == "booker": menu_options = ["➕ Booker"]
+elif user_role == "dispatcher": menu_options = ["🖥️ Dispatcher"]
+elif user_role == "driver": menu_options = ["𚖖 งานของฉัน (Driver)"]
+elif user_role == "airportstaff": menu_options = ["✈️ Airport Staff"]
+else: menu_options = ["📝 ลงทะเบียนพนักงานใหม่"]
 
-# Logic วาร์ป Admin
-if user_role == "admin" and "user" in query_params:
-    cmd = query_params["user"].strip().lower()
-    if cmd == "admin01": st.session_state["current_menu_choice"] = "🏠 Dashboard"
+if "current_menu_choice" not in st.session_state: st.session_state["current_menu_choice"] = menu_options[0]
 
 choice = st.sidebar.radio("เมนูใช้งาน", options=menu_options, index=menu_options.index(st.session_state["current_menu_choice"]) if st.session_state["current_menu_choice"] in menu_options else 0)
 st.session_state["current_menu_choice"] = choice
 
-if user_role == "driver" and choice != "𚖖 งานของฉัน (Driver)":
+if user_role == "driver" and choice != "🚖 งานของฉัน (Driver)":
     st.session_state["current_menu_choice"] = "𚖖 งานของฉัน (Driver)"
     st.rerun()
     
