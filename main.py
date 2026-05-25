@@ -5,7 +5,7 @@ import requests
 import datetime as dt_module
 import streamlit.components.v1 as components
 
-# --- 1. ตั้งค่าฐานข้อมูล ---
+# --- 1. การตั้งค่าพื้นฐานและการเชื่อมต่อ DB ---
 def get_connection():
     return pymysql.connect(
         host='mysql-22653bef-kla-e55d.c.aivencloud.com',
@@ -23,7 +23,7 @@ def send_line_message(message, target_id):
     try: requests.post(url, headers=headers, json=data)
     except: pass
 
-# --- 2. เช็คสิทธิ์ ---
+# --- 2. ระบบเช็คสิทธิ์ผู้ใช้งาน ---
 def check_permission(user_id):
     if not user_id or user_id.startswith("GUEST_") or "*" in user_id: return "guest"
     uid = user_id.strip().lower()
@@ -41,7 +41,7 @@ def check_permission(user_id):
 
 st.set_page_config(page_title="ระบบจัดการรถ Hunsa", layout="wide")
 
-# --- 3. ดักจับไอดี ---
+# --- 3. ดักจับไอดีผ่าน URL ---
 query_params = st.query_params
 if "lineidtoemp" in query_params: st.session_state.default_user_id = query_params["lineidtoemp"].strip()
 elif "user" in query_params: st.session_state.default_user_id = query_params["user"].strip()
@@ -49,9 +49,9 @@ elif "user" in query_params: st.session_state.default_user_id = query_params["us
 current_id = st.sidebar.text_input("ระบุ LINE User ID", value=st.session_state.get("default_user_id", "")).strip()
 st.session_state.default_user_id = current_id
 user_role = check_permission(current_id)
-st.sidebar.info(f"สิทธิ์ของคุณ: {user_role.upper()}")
+st.sidebar.info(f"สิทธิ์: {user_role.upper()}")
 
-# --- 4. จัดเมนูตามสิทธิ์ ---
+# --- 4. จัดเมนู ---
 menu_options = []
 if user_role == "admin": menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "𚖖 งานของฉัน (Driver)", "✈️ Airport Staff"]
 elif user_role == "booker": menu_options = ["➕ Booker"]
@@ -60,8 +60,9 @@ elif user_role == "driver": menu_options = ["𚖖 งานของฉัน (D
 elif user_role == "airportstaff": menu_options = ["✈️ Airport Staff"]
 else: menu_options = ["📝 ลงทะเบียนพนักงานใหม่"]
 
-# ระบบวาร์ปหน้าจออัตโนมัติสำหรับ Admin
 if "current_menu_choice" not in st.session_state: st.session_state["current_menu_choice"] = menu_options[0]
+
+# วาร์ปอัตโนมัติสำหรับ Admin
 if user_role == "admin" and "user" in query_params:
     cmd = query_params["user"].strip().lower()
     if cmd == "admin01": st.session_state["current_menu_choice"] = "🏠 Dashboard"
@@ -71,30 +72,57 @@ if user_role == "admin" and "user" in query_params:
 choice = st.sidebar.radio("เมนูใช้งาน", options=menu_options, index=menu_options.index(st.session_state["current_menu_choice"]) if st.session_state["current_menu_choice"] in menu_options else 0)
 st.session_state["current_menu_choice"] = choice
 
-# --- 5. หน้า Dashboard (รวมระบบจัดการพนักงาน) ---
+if user_role == "driver" and choice != "𚖖 งานของฉัน (Driver)":
+    st.session_state["current_menu_choice"] = "𚖖 งานของฉัน (Driver)"
+    st.rerun()
+
+# --- 5. แยกหน้าแสดงผล (Dashboard และส่วนอื่นๆ) ---
 if choice == "🏠 Dashboard":
     st.title("🏠 Dashboard")
-    db = get_connection()
-    if user_role == "admin":
-        st.write("### 👥 จัดการสิทธิ์พนักงาน")
-        df_users = pd.read_sql("SELECT line_user_id as 'ID', name as 'ชื่อ', role as 'ตำแหน่ง', status as 'สถานะ' FROM users", db)
-        st.dataframe(df_users, width=800, hide_index=True)
-        with st.expander("➕ เพิ่ม/แก้ไขสิทธิ์"):
-            with st.form("edit_u"):
-                e_id = st.text_input("LINE User ID")
-                e_name = st.text_input("ชื่อ-นามสกุล")
-                e_role = st.selectbox("ตำแหน่ง", ["admin", "booker", "dispatcher", "driver", "airportstaff", "guest"])
-                e_status = st.radio("สถานะ", ["Active", "Inactive"], horizontal=True)
-                if st.form_submit_button("💾 บันทึก"):
-                    cursor = db.cursor()
-                    cursor.execute("INSERT INTO users VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE name=%s, role=%s, status=%s", (e_id, e_name, e_role, e_status, e_name, e_role, e_status))
-                    db.commit()
-                    st.rerun()
-    db.close()
     st.write("---")
-    st.write("### ⏱️ งานล่าสุด")
-    # ... (ส่วนตารางงานล่าสุดเหมือนเดิม) ...
+    
+    db = get_connection()
+    try:
+        with db.cursor() as cursor:
+            # ดึงข้อมูล Metric
+            cursor.execute("SELECT COUNT(*) FROM bookings WHERE status = 'Pending'")
+            count_pending = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM bookings WHERE status IN ('Assigned', 'Accepted')")
+            count_active = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'driver'")
+            count_drivers = cursor.fetchone()[0]
+            # ดึงรายชื่อพนักงาน
+            cursor.execute("SELECT line_user_id, name, role, status FROM users ORDER BY role ASC")
+            users_data = cursor.fetchall()
+            df_users = pd.DataFrame(users_data, columns=['LINE User ID', 'ชื่อ-นามสกุล', 'ตำแหน่ง', 'สถานะ'])
 
+        col_m1, col_m2, col_m3 = st.columns(3)
+        col_m1.metric("⏳ งานรอจัดสรร", count_pending)
+        col_m2.metric("🚀 รถกำลังวิ่ง", count_active)
+        col_m3.metric("🚖 คนขับทั้งหมด", count_drivers)
+        
+        # จัดการพนักงาน (Admin Only)
+        if user_role == "admin":
+            st.write("### 👥 ระบบจัดการสิทธิ์พนักงาน (Quick Access)")
+            st.dataframe(df_users, width='stretch', hide_index=True)
+            with st.expander("➕ เพิ่ม/แก้ไขสิทธิ์พนักงาน"):
+                with st.form("quick_user_mgmt"):
+                    e_id = st.text_input("LINE User ID").strip()
+                    e_name = st.text_input("ชื่อ-นามสกุล").strip()
+                    e_role = st.selectbox("ตำแหน่ง", ["admin", "booker", "dispatcher", "driver", "airportstaff", "guest"])
+                    e_status = st.radio("สถานะ", ["Active", "Inactive"], horizontal=True)
+                    if st.form_submit_button("💾 บันทึกสิทธิ์"):
+                        cursor.execute("INSERT INTO users VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE name=%s, role=%s, status=%s", (e_id, e_name, e_role, e_status, e_name, e_role, e_status))
+                        db.commit()
+                        st.success("บันทึกเรียบร้อย!")
+                        st.rerun()
+
+    except Exception as e: st.error(f"Error: {e}")
+    finally: db.close()
+
+elif choice == "📝 ลงทะเบียนพนักงานใหม่":
+    # (โค้ดหน้าสมัครเดิมของแอดมิน)
+    pass
 # --- 6. หน้า ลงทะเบียน (Register) ---
 elif choice == "📝 ลงทะเบียนพนักงานใหม่":
     st.title("📝 ลงทะเบียนพนักงานใหม่")
