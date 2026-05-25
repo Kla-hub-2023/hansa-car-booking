@@ -30,7 +30,9 @@ st.session_state.default_user_id = current_id
 user_role = check_permission(current_id)
 st.sidebar.info(f"สิทธิ์: {user_role.upper()}")
 
-menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "𚖖 งานของฉัน (Driver)", "✈️ Airport Staff", "📝 ลงทะเบียนพนักงานใหม่", "👥 จัดการพนักงาน"]
+# แก้ตรงนี้ครับ
+if user_role == "admin": 
+    menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "🚖 งานของฉัน (Driver)", "✈️ Airport Staff"]
 if "current_menu_choice" not in st.session_state: st.session_state["current_menu_choice"] = menu_options[0]
 
 # Logic วาร์ป Admin
@@ -176,4 +178,224 @@ elif choice == "➕ Booker":
         else: st.info("💡 ยังไม่มีรายการงานค้างในระบบ")
     except Exception as e: st.error(f"❌ ไม่สามารถดึงข้อมูลได้: {e}")
     finally: db.close()
+elif choice == "🖥️ Dispatcher":
+    st.title("🎛️ แผงควบคุมสำหรับ Dispatcher")
+    st.write("---")
     
+    db = get_connection()
+    try:
+        # 1. ดึงข้อมูลคนขับ
+        cursor = db.cursor()
+        cursor.execute("SELECT line_user_id, name FROM users WHERE role = 'driver' AND status = 'Active'")
+        drivers_data = cursor.fetchall()
+        driver_options = {f"🚗 {d[1]} ({d[0][:6]}...)": d[0] for d in drivers_data}
+        
+        # 2. ดึงข้อมูลงาน
+        df_bookings = pd.read_sql("""
+            SELECT id, voucher_no, passenger_name, pickup_location, dropoff_location, status, driver_id 
+            FROM bookings 
+            WHERE status IN ('Pending', 'Assigned')
+            ORDER BY id DESC
+        """, db)
+        
+        if not df_bookings.empty:
+            # เพิ่มคอลัมน์ชื่อคนขับแบบปลอดภัย
+            df_bookings['คนขับที่รับงาน'] = df_bookings['driver_id'].map(lambda x: dict(drivers_data).get(x, "ยังไม่ได้จ่ายงาน") if x else "ยังไม่ได้จ่ายงาน")
+            
+            st.write("### 📊 ตารางสถานะงาน")
+            st.dataframe(df_bookings[['voucher_no', 'passenger_name', 'status', 'คนขับที่รับงาน']], width='stretch', hide_index=True)
+            
+            # 3. ส่วนการจ่ายงานและปิดงาน
+            col_assign, col_complete = st.columns(2)
+            
+            with col_assign:
+                st.write("### 🚖 จ่ายงานใหม่")
+                job_map = {f"🎫 {row['voucher_no']} ({row['passenger_name']})": row['id'] for _, row in df_bookings.iterrows()}
+                sel_job = st.selectbox("เลือกงาน", list(job_map.keys()))
+                sel_driver = st.selectbox("เลือกคนขับ", list(driver_options.keys()))
+                
+                if st.button("💾 บันทึกการมอบหมาย"):
+                    cursor.execute("UPDATE bookings SET driver_id = %s, status = 'Assigned' WHERE id = %s", 
+                                   (driver_options[sel_driver], job_map[sel_job]))
+                    db.commit()
+                    st.success("จ่ายงานเรียบร้อย!")
+                    st.rerun()
+
+            with col_complete:
+                st.write("### 🏁 ปิดงาน")
+                active_jobs = df_bookings[df_bookings['status'] == 'Assigned']
+                if not active_jobs.empty:
+                    job_opts = {f"✅ {row['voucher_no']}": row['id'] for _, row in active_jobs.iterrows()}
+                    sel_done = st.selectbox("เลือกงานปิดสถานะ", list(job_opts.keys()))
+                    if st.button("🏁 ยืนยันปิดงาน"):
+                        cursor.execute("UPDATE bookings SET status = 'Completed' WHERE id = %s", (job_opts[sel_done],))
+                        db.commit()
+                        st.success("ปิดงานสำเร็จ!")
+                        st.rerun()
+                else:
+                    st.info("ไม่มีงานที่กำลังวิ่งอยู่ให้กดปิด")
+        else:
+            st.info("✨ ไม่มีงานค้างในระบบ")
+            
+    except Exception as e: st.error(f"Error: {e}")
+    finally: db.close()
+elif choice == "🚖 งานของฉัน (Driver)":
+    st.title("🚖 งานของฉัน (Driver)")
+    
+    # 1. ดึงชื่อคนขับเพื่อความ Friendly
+    driver_name = "คนขับรถ"
+    db = get_connection()
+    try:
+        with db.cursor() as cursor:
+            cursor.execute("SELECT name FROM users WHERE line_user_id = %s", (current_id,))
+            res = cursor.fetchone()
+            if res: driver_name = res[0]
+        st.subheader(f"👋 สวัสดีคุณ: {driver_name}")
+        st.write("---")
+        
+        # 2. ดึงงานปัจจุบัน (ที่สถานะ Assigned หรือ Accepted)
+        df_driver = pd.read_sql("""
+            SELECT id, voucher_no, passenger_name, pickup_location, dropoff_location, status 
+            FROM bookings 
+            WHERE driver_id = %s AND status IN ('Assigned', 'Accepted')
+            ORDER BY booking_time ASC
+        """, db, params=(current_id,))
+        
+        if not df_driver.empty:
+            st.write("### 📥 รายการงานที่ได้รับมอบหมาย")
+            st.dataframe(df_driver, width='stretch', hide_index=True)
+            
+            # ระบบกดรับงาน (เฉพาะงานที่ status เป็น Assigned)
+            assigned_jobs = df_driver[df_driver['status'] == 'Assigned']
+            if not assigned_jobs.empty:
+                st.write("---")
+                st.write("### 📥 งานใหม่รอรับทราบ")
+                job_map = {f"🎫 {row['voucher_no']} | ลูกค้า {row['passenger_name']}": row['id'] for _, row in assigned_jobs.iterrows()}
+                selected_job = st.selectbox("เลือกงานที่ต้องการรับ", list(job_map.keys()))
+                
+                if st.button("✅ กดรับทราบและยอมรับงาน"):
+                    cursor.execute("UPDATE bookings SET status = 'Accepted' WHERE id = %s", (job_map[selected_job],))
+                    db.commit()
+                    # ส่งข้อความกลับไปหา Dispatcher (ถ้ามี)
+                    send_line_message(f"✅ คนขับ {driver_name} กดรับงานแล้ว!", "dispatcher01") 
+                    st.success("รับงานเรียบร้อย!")
+                    st.rerun()
+        else:
+            st.info("✨ ปัจจุบันคุณยังไม่มีงานค้างที่ต้องปฏิบัติครับ")
+            
+    except Exception as e: st.error(f"Error: {e}")
+    finally: db.close()
+
+    # 3. ส่วนประวัติการวิ่งงาน
+    st.write("---")
+    st.write("### ✅ ประวัติการวิ่งงาน (Completed)")
+    try:
+        db = get_connection()
+        df_history = pd.read_sql("SELECT voucher_no, passenger_name, status FROM bookings WHERE driver_id = %s AND status = 'Completed' ORDER BY id DESC LIMIT 20", db, params=(current_id,))
+        if not df_history.empty:
+            st.dataframe(df_history, width='stretch', hide_index=True)
+        else:
+            st.info("ยังไม่มีประวัติการวิ่งงานครับ")
+    except Exception as e: st.error(f"Error: {e}")
+    finally: db.close()
+elif choice == "✈️ Airport Staff":
+    st.title("✈️ ตรวจสอบสถานะรถ (Airport Staff)")
+    st.subheader("📋 ตารางมอนิเตอร์รถยนต์และคนขับที่กำลังปฏิบัติงาน")
+
+    try:
+        db = get_connection()
+        # ดึงงานที่ Assigned (กำลังไปรับ) หรือ Accepted (คนขับรับทราบแล้ว)
+        query = """
+            SELECT b.voucher_no AS 'เลข Voucher', b.passenger_name AS 'ชื่อผู้โดยสาร', 
+                   b.pickup_location AS 'จุดรับ', b.dropoff_location AS 'จุดส่ง', 
+                   b.booking_time AS 'เวลาเดินทาง', b.status AS 'สถานะงาน', 
+                   u.name AS 'คนขับรถที่รับงาน'
+            FROM bookings b 
+            LEFT JOIN users u ON b.driver_id = u.line_user_id
+            WHERE b.status IN ('Assigned', 'Accepted') 
+            ORDER BY b.booking_time ASC
+        """
+        df_airport = pd.read_sql(query, db)
+        
+        if not df_airport.empty:
+            st.write("✨ แสดงงานที่กำลังดำเนินการภาคพื้นสนามบิน")
+            
+            # ใส่สีสถานะงาน
+            def highlight_status(row):
+                color = '#fff3cd' if row['สถานะงาน'] == 'Assigned' else '#d4edda'
+                return [f'background-color: {color}'] * len(row)
+            
+            st.dataframe(df_airport.style.apply(highlight_status, axis=1), width='stretch', hide_index=True)
+            
+            st.write("---")
+            col1, col2 = st.columns(2)
+            with col1: 
+                st.metric(label="🚖 กำลังเดินทาง (Assigned)", value=len(df_airport[df_airport['สถานะงาน'] == 'Assigned']))
+            with col2: 
+                st.metric(label="✅ คนขับรับทราบงานแล้ว (Accepted)", value=len(df_airport[df_airport['สถานะงาน'] == 'Accepted']))
+        else:
+            st.info("ℹ️ ปัจจุบันยังไม่มีรถยนต์ที่อยู่ในสถานะรับงานครับ")
+            
+    except Exception as e: 
+        st.error(f"❌ เกิดข้อผิดพลาดในการดึงข้อมูล: {e}")
+    finally: 
+        if 'db' in locals() and db.open: db.close()
+elif choice == "📝 ลงทะเบียนพนักงานใหม่":
+    st.title("📝 ลงทะเบียนพนักงานใหม่")
+    
+    # ส่วนดึง LINE ID ด้วย LIFF
+    st.markdown("### 🔍 วิธีการดึงรหัสประจำตัวเครื่อง")
+    st.info("กรุณากดปุ่มด้านล่างเพื่อดึงรหัส LINE User ID อัตโนมัติ แล้วนำไปวางในช่องสมัครครับ 👇")
+
+    pure_js_html = """
+    <div style="background-color:#ffffff; padding:15px; border-radius:8px; border:2px dashed #28a745; text-align:center;">
+        <button id="btn-scan" style="background-color:#28a745; color:white; border:none; padding:12px 24px; font-size:16px; font-weight:bold; border-radius:5px; cursor:pointer; width:100%; max-width:320px;">
+            🟢 ดึง LINE ID ของคุณ
+        </button>
+        <div id="display-output" style="display:none; margin-top:15px;">
+            <input type="text" id="id-box" style="width:100%; max-width:320px; padding:10px; text-align:center; border:1px solid #ced4da; border-radius:4px;" readonly>
+            <br><br>
+            <button onclick="navigator.clipboard.writeText(document.getElementById('id-box').value); alert('คัดลอกรหัสแล้วครับ');" style="background-color:#007bff; color:white; border:none; padding:8px 16px; border-radius:4px; cursor:pointer;">
+                📋 คัดลอกรหัส
+            </button>
+        </div>
+    </div>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script>
+    document.getElementById('btn-scan').addEventListener('click', function() {
+        liff.init({ liffId: "2010148491-zYBksiiv" }).then(() => {
+            liff.getProfile().then(p => {
+                document.getElementById('btn-scan').style.display = 'none';
+                document.getElementById('display-output').style.display = 'block';
+                document.getElementById('id-box').value = p.userId;
+            });
+        });
+    });
+    </script>
+    """
+    components.html(pure_js_html, height=180)
+    
+    st.write("---")
+    st.write("### 👤 กรอกข้อมูลรายงานตัว")
+    
+    with st.form("guest_register_form", clear_on_submit=True):
+        reg_name = st.text_input("ชื่อ - นามสกุลจริง", placeholder="เช่น นายสมชาย ใจดีมาก").strip()
+        reg_line_id = st.text_input("LINE User ID", value=current_id, placeholder="กดดึงรหัสด้านบนแล้วนำมาวางที่นี่")
+        
+        if st.form_submit_button("🚀 ส่งข้อมูลลงทะเบียน"):
+            if not reg_name or not reg_line_id:
+                st.error("⚠️ กรุณากรอกชื่อและรหัส LINE ID ให้ครบถ้วนครับ")
+            else:
+                try:
+                    conn = get_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        INSERT INTO users (line_user_id, name, role, status)
+                        VALUES (%s, %s, 'guest', 'Active')
+                        ON DUPLICATE KEY UPDATE name = %s, role = 'guest', status = 'Active'
+                    """, (reg_line_id, reg_name, reg_name))
+                    conn.commit()
+                    conn.close()
+                    st.success("🎉 ส่งข้อมูลเรียบร้อย! โปรดรอแอดมินอนุมัติสิทธิ์ครับ")
+                except Exception as e:
+                    st.error(f"❌ เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
