@@ -44,7 +44,7 @@ user_role = check_permission(current_id)
 st.sidebar.info(f"สิทธิ์: {user_role.upper()}")
 
 menu_options = []
-if user_role == "admin": menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "🚖 งานของฉัน (Driver)", "✈️ Airport Staff"]
+if user_role == "admin": menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "🚖 งานของฉัน (Driver)", "✈️ Airport Staff","📝 ลงทะเบียนพนักงานใหม่"]
 elif user_role == "booker": menu_options = ["➕ Booker"]
 elif user_role == "dispatcher": menu_options = ["🖥️ Dispatcher"]
 elif user_role == "driver": menu_options = ["𚖖 งานของฉัน (Driver)"]
