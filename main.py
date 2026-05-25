@@ -135,8 +135,65 @@ if choice == "🏠 Dashboard":
     finally: db.close()
 
 elif choice == "📝 ลงทะเบียนพนักงานใหม่":
-    # (โค้ดหน้าสมัครเดิมของแอดมิน)
-    pass
+    st.title("📝 ลงทะเบียนพนักงานใหม่")
+    
+    # ส่วนดึง LINE ID ด้วย LIFF
+    st.markdown("### 🔍 วิธีการดึงรหัสประจำตัวเครื่อง")
+    st.info("กรุณากดปุ่มด้านล่างเพื่อดึงรหัส LINE User ID อัตโนมัติ แล้วนำไปวางในช่องสมัครครับ 👇")
+
+    pure_js_html = """
+    <div style="background-color:#ffffff; padding:15px; border-radius:8px; border:2px dashed #28a745; text-align:center;">
+        <button id="btn-scan" style="background-color:#28a745; color:white; border:none; padding:12px 24px; font-size:16px; font-weight:bold; border-radius:5px; cursor:pointer; width:100%; max-width:320px;">
+            🟢 ดึง LINE ID ของคุณ
+        </button>
+        <div id="display-output" style="display:none; margin-top:15px;">
+            <input type="text" id="id-box" style="width:100%; max-width:320px; padding:10px; text-align:center; border:1px solid #ced4da; border-radius:4px;" readonly>
+            <br><br>
+            <button onclick="navigator.clipboard.writeText(document.getElementById('id-box').value); alert('คัดลอกรหัสแล้วครับ');" style="background-color:#007bff; color:white; border:none; padding:8px 16px; border-radius:4px; cursor:pointer;">
+                📋 คัดลอกรหัส
+            </button>
+        </div>
+    </div>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script>
+    document.getElementById('btn-scan').addEventListener('click', function() {
+        liff.init({ liffId: "2010148491-zYBksiiv" }).then(() => {
+            liff.getProfile().then(p => {
+                document.getElementById('btn-scan').style.display = 'none';
+                document.getElementById('display-output').style.display = 'block';
+                document.getElementById('id-box').value = p.userId;
+            });
+        });
+    });
+    </script>
+    """
+    components.html(pure_js_html, height=180)
+    
+    st.write("---")
+    st.write("### 👤 กรอกข้อมูลรายงานตัว")
+    
+    with st.form("guest_register_form", clear_on_submit=True):
+        reg_name = st.text_input("ชื่อ - นามสกุลจริง", placeholder="เช่น นายสมชาย ใจดีมาก").strip()
+        reg_line_id = st.text_input("LINE User ID", value=current_id, placeholder="กดดึงรหัสด้านบนแล้วนำมาวางที่นี่")
+        
+        if st.form_submit_button("🚀 ส่งข้อมูลลงทะเบียน"):
+            if not reg_name or not reg_line_id:
+                st.error("⚠️ กรุณากรอกชื่อและรหัส LINE ID ให้ครบถ้วนครับ")
+            else:
+                try:
+                    conn = get_connection()
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        INSERT INTO users (line_user_id, name, role, status)
+                        VALUES (%s, %s, 'guest', 'Active')
+                        ON DUPLICATE KEY UPDATE name = %s, role = 'guest', status = 'Active'
+                    """, (reg_line_id, reg_name, reg_name))
+                    conn.commit()
+                    conn.close()
+                    st.success("🎉 ส่งข้อมูลเรียบร้อย! โปรดรอแอดมินอนุมัติสิทธิ์ครับ")
+                except Exception as e:
+                    st.error(f"❌ เกิดข้อผิดพลาด: {e}")
+                    
 # --- 6. หน้า ลงทะเบียน (Register) ---
 elif choice == "📝 ลงทะเบียนพนักงานใหม่":
     st.title("📝 ลงทะเบียนพนักงานใหม่")
