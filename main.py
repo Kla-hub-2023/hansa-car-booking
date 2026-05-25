@@ -84,38 +84,52 @@ if choice == "🏠 Dashboard":
     db = get_connection()
     try:
         with db.cursor() as cursor:
-            # ดึงข้อมูล Metric
-            cursor.execute("SELECT COUNT(*) FROM bookings WHERE status = 'Pending'")
-            count_pending = cursor.fetchone()[0]
-            cursor.execute("SELECT COUNT(*) FROM bookings WHERE status IN ('Assigned', 'Accepted')")
-            count_active = cursor.fetchone()[0]
-            cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'driver'")
-            count_drivers = cursor.fetchone()[0]
-            # ดึงรายชื่อพนักงาน
+            # ดึงข้อมูลมาแสดง
             cursor.execute("SELECT line_user_id, name, role, status FROM users ORDER BY role ASC")
             users_data = cursor.fetchall()
             df_users = pd.DataFrame(users_data, columns=['LINE User ID', 'ชื่อ-นามสกุล', 'ตำแหน่ง', 'สถานะ'])
-
-        col_m1, col_m2, col_m3 = st.columns(3)
-        col_m1.metric("⏳ งานรอจัดสรร", count_pending)
-        col_m2.metric("🚀 รถกำลังวิ่ง", count_active)
-        col_m3.metric("🚖 คนขับทั้งหมด", count_drivers)
         
-        # จัดการพนักงาน (Admin Only)
+        # ส่วนจัดการพนักงานสำหรับ Admin
         if user_role == "admin":
-            st.write("### 👥 ระบบจัดการสิทธิ์พนักงาน (Quick Access)")
+            st.write("### 👥 ระบบจัดการสิทธิ์พนักงาน")
             st.dataframe(df_users, width='stretch', hide_index=True)
-            with st.expander("➕ เพิ่ม/แก้ไขสิทธิ์พนักงาน"):
-                with st.form("quick_user_mgmt"):
-                    e_id = st.text_input("LINE User ID").strip()
-                    e_name = st.text_input("ชื่อ-นามสกุล").strip()
-                    e_role = st.selectbox("ตำแหน่ง", ["admin", "booker", "dispatcher", "driver", "airportstaff", "guest"])
-                    e_status = st.radio("สถานะ", ["Active", "Inactive"], horizontal=True)
-                    if st.form_submit_button("💾 บันทึกสิทธิ์"):
-                        cursor.execute("INSERT INTO users VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE name=%s, role=%s, status=%s", (e_id, e_name, e_role, e_status, e_name, e_role, e_status))
-                        db.commit()
-                        st.success("บันทึกเรียบร้อย!")
-                        st.rerun()
+            
+            # --- จุดแก้ไข: ทำ Selectbox เลือกรายชื่อเพื่อดึงข้อมูลมาใส่ฟอร์ม ---
+            st.write("#### 📝 เลือกพนักงานเพื่อแก้ไขข้อมูล")
+            
+            # สร้าง List สำหรับให้เลือก โดยดึงจากฐานข้อมูล
+            user_options = {f"{row['ชื่อ-นามสกุล']} ({row['LINE User ID']})": row for _, row in df_users.iterrows()}
+            selected_user = st.selectbox("เลือกรายชื่อพนักงาน", ["-- เลือกพนักงาน --"] + list(user_options.keys()))
+            
+            # เตรียมค่า Default ไว้
+            default_id = ""
+            default_name = ""
+            default_role = "driver"
+            default_status = "Active"
+            
+            # ถ้ามีการเลือก ให้ดึงข้อมูลมาใส่ตัวแปร
+            if selected_user != "-- เลือกพนักงาน --":
+                u_info = user_options[selected_user]
+                default_id = u_info['LINE User ID']
+                default_name = u_info['ชื่อ-นามสกุล']
+                default_role = u_info['ตำแหน่ง']
+                default_status = u_info['สถานะ']
+
+            with st.form("quick_user_mgmt"):
+                # ID ให้เป็น read-only เพราะไม่ควรแก้
+                e_id = st.text_input("LINE User ID", value=default_id) 
+                e_name = st.text_input("ชื่อ-นามสกุล", value=default_name)
+                e_role = st.selectbox("ตำแหน่ง", ["admin", "booker", "dispatcher", "driver", "airportstaff", "guest"], 
+                                     index=["admin", "booker", "dispatcher", "driver", "airportstaff", "guest"].index(default_role) if default_role in ["admin", "booker", "dispatcher", "driver", "airportstaff", "guest"] else 3)
+                e_status = st.radio("สถานะ", ["Active", "Inactive"], index=0 if default_status == "Active" else 1, horizontal=True)
+                
+                if st.form_submit_button("💾 บันทึกสิทธิ์"):
+                    cursor = db.cursor()
+                    cursor.execute("INSERT INTO users (line_user_id, name, role, status) VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE name=%s, role=%s, status=%s", 
+                                   (e_id, e_name, e_role, e_status, e_name, e_role, e_status))
+                    db.commit()
+                    st.success("บันทึกเรียบร้อย!")
+                    st.rerun()
 
     except Exception as e: st.error(f"Error: {e}")
     finally: db.close()
