@@ -44,10 +44,11 @@ user_role = check_permission(current_id)
 st.sidebar.info(f"สิทธิ์: {user_role.upper()}")
 
 menu_options = []
-if user_role == "admin": menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "🚖 งานของฉัน (Driver)", "✈️ Airport Staff","📝 ลงทะเบียนพนักงานใหม่"]
+if user_role == "admin": 
+    menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "🚖 งานของฉัน (Driver)", "✈️ Airport Staff", "📝 ลงทะเบียนพนักงานใหม่"]
 elif user_role == "booker": menu_options = ["➕ Booker"]
 elif user_role == "dispatcher": menu_options = ["🖥️ Dispatcher"]
-elif user_role == "driver": menu_options = ["𚖖 งานของฉัน (Driver)"]
+elif user_role == "driver": menu_options = ["🚖 งานของฉัน (Driver)"]
 elif user_role == "airportstaff": menu_options = ["✈️ Airport Staff"]
 else: menu_options = ["📝 ลงทะเบียนพนักงานใหม่"]
 
@@ -60,7 +61,8 @@ if user_role == "driver" and choice != "🚖 งานของฉัน (Driver
     st.session_state["current_menu_choice"] = "🚖 งานของฉัน (Driver)"
     st.rerun()
     
-elif choice == "🏠 Dashboard":
+# --- 4. แยกหน้าแสดงผลตามตัวเลือกเมนู ---
+if choice == "🏠 Dashboard":
     st.title("🏠 Dashboard")
     st.write("---")
     
@@ -82,102 +84,102 @@ elif choice == "🏠 Dashboard":
     except Exception as e: st.error(f"Error Metric: {e}")
     finally: db.close()
 
-    # 2. ส่วนจัดการพนักงาน (แยกการเปิด-ปิด DB เพื่อป้องกัน Cursor closed)
+    # 2. ส่วนจัดการพนักงาน
     if user_role == "admin":
         st.title("👥 ระบบจัดการสิทธิ์ผู้ใช้งาน (User Management)")
         st.write("---")
     
-    st.write("### ⏳ รายชื่อพนักงานใหม่ที่รออนุมัติสิทธิ์ (Guests)")
-    try:
-        db = get_connection()
-        with db.cursor() as cursor:
-            cursor.execute("SELECT line_user_id, name, role FROM users WHERE role = 'guest'")
-            guests_data = cursor.fetchall()
-        if guests_data:
-            df_guests = pd.DataFrame(guests_data, columns=['รหัส LINE User ID', 'ชื่อรายงานตัวพนักงาน', 'สถานะ'])
-            st.dataframe(df_guests, width='stretch', hide_index=True)
-            st.sidebar.info("💡 แอดมินสามารถก๊อปปี้รหัส LINE ID จากตารางด้านบนมาวางในกล่องแก้ไขเพื่ออัปเดตตำแหน่งได้ครับ")
-        else: st.success("✨ เรียบร้อยดี! ไม่มีพนักงานใหม่ค้างรออนุมัติสิทธิ์ในระบบครับ")
-    except Exception as e: st.error(f"เกิดข้อผิดพลาดในการดึงข้อมูล Guest: {e}")
-    finally:
-        if 'db' in locals() and db.open: db.close()
+        st.write("### ⏳ รายชื่อพนักงานใหม่ที่รออนุมัติสิทธิ์ (Guests)")
+        try:
+            db = get_connection()
+            with db.cursor() as cursor:
+                cursor.execute("SELECT line_user_id, name, role FROM users WHERE role = 'guest'")
+                guests_data = cursor.fetchall()
+            if guests_data:
+                df_guests = pd.DataFrame(guests_data, columns=['รหัส LINE User ID', 'ชื่อรายงานตัวพนักงาน', 'สถานะ'])
+                st.dataframe(df_guests, width='stretch', hide_index=True)
+                st.sidebar.info("💡 แอดมินสามารถก๊อปปี้รหัส LINE ID จากตารางด้านบนมาวางในกล่องแก้ไขเพื่ออัปเดตตำแหน่งได้ครับ")
+            else: st.success("✨ เรียบร้อยดี! ไม่มีพนักงานใหม่ค้างรออนุมัติสิทธิ์ในระบบครับ")
+        except Exception as e: st.error(f"เกิดข้อผิดพลาดในการดึงข้อมูล Guest: {e}")
+        finally:
+            if 'db' in locals() and db.open: db.close()
 
-    st.write("---")
-    try:
-        db = get_connection()
-        with db.cursor() as cursor: 
-            cursor.execute("SELECT line_user_id, name, role, status FROM users")
-            all_users = cursor.fetchall()
-        user_list_options = {f"👤 {u[1]} ({u[2].upper()}) - [{u[3] if u[3] else 'Active'}]": u for u in all_users}
-    except Exception as e: 
-        user_list_options = {}
-    finally:
-        if 'db' in locals() and db.open: db.close()
+        st.write("---")
+        try:
+            db = get_connection()
+            with db.cursor() as cursor: 
+                cursor.execute("SELECT line_user_id, name, role, status FROM users")
+                all_users = cursor.fetchall()
+            user_list_options = {f"👤 {u[1]} ({u[2].upper()}) - [{u[3] if u[3] else 'Active'}]": u for u in all_users}
+        except Exception as e: 
+            user_list_options = {}
+        finally:
+            if 'db' in locals() and db.open: db.close()
 
-    col_form_edit, col_form_del = st.columns([2, 1])
+        col_form_edit, col_form_del = st.columns([2, 1])
 
-    with col_form_edit:
-        st.write("📝 **ระบบลงทะเบียน / แก้ไข และ ปรับสถานะพนักงาน**")
-        select_user_action = st.selectbox("💡 เลือกพนักงานที่ต้องการแก้ไข (หรือเลือกเพิ่มคนใหม่)", options=["➕ ลงทะเบียนพนักงานใหม่ / กรอกเอง"] + list(user_list_options.keys()))
-        init_id, init_name, init_role, init_status = "", "", "driver", "Active"
-        
-        if select_user_action != "➕ ลงทะเบียนพนักงานใหม่ / กรอกเอง":
-            user_data = user_list_options[select_user_action]
-            init_id, init_name = user_data[0], user_data[1]
-            init_role = user_data[2].lower() if user_data[2] else "driver"
-            init_status = user_data[3] if user_data[3] else "Active"
-
-        with st.form("user_management_form", clear_on_submit=False):
-            new_line_id = st.text_input("ระบุ LINE User ID", value=init_id).strip()
-            new_name = st.text_input("ระบุชื่อ-นามสกุลจริง ของพนักงาน", value=init_name).strip()
-            roles_pool = ["admin", "booker", "dispatcher", "driver", "airportstaff", "guest"]
-            new_role = st.selectbox("กำหนดตำแหน่ง (Role)", roles_pool, index=roles_pool.index(init_role) if init_role in roles_pool else 3)
-            status_pool = ["Active", "Inactive"]
-            new_status = st.radio("🚦 Status การใช้งานระบบ", status_pool, index=status_pool.index(init_status) if init_status in status_pool else 0, horizontal=True)
-            submit_user = st.form_submit_button("💾 อนุมัติและบันทึกสิทธิ์")
+        with col_form_edit:
+            st.write("📝 **ระบบลงทะเบียน / แก้ไข และ ปรับสถานะพนักงาน**")
+            select_user_action = st.selectbox("💡 เลือกพนักงานที่ต้องการแก้ไข (หรือเลือกเพิ่มคนใหม่)", options=["➕ ลงทะเบียนพนักงานใหม่ / กรอกเอง"] + list(user_list_options.keys()))
+            init_id, init_name, init_role, init_status = "", "", "driver", "Active"
             
-            if submit_user:
-                if new_line_id and new_name:
-                    try:
-                        conn = get_connection()
-                        cursor = conn.cursor()
-                        sql = "INSERT INTO users (line_user_id, name, role, status) VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE name = %s, role = %s, status = %s"
-                        cursor.execute(sql, (new_line_id, new_name, new_role, new_status, new_name, new_role, new_status))
-                        conn.commit()
-                        cursor.close()
-                        conn.close()
-                        st.success(f"🎉 บันทึกข้อมูลและอัปเดตสถานะพนักงานเรียบร้อยแล้ว!")
-                        st.rerun()
-                    except Exception as e: st.error(f"❌ เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
-                else: st.warning("⚠️ รบกวนกรอก LINE ID และชื่อพนักงานให้ครบถ้วนครับ")
+            if select_user_action != "➕ ลงทะเบียนพนักงานใหม่ / กรอกเอง":
+                user_data = user_list_options[select_user_action]
+                init_id, init_name = user_data[0], user_data[1]
+                init_role = user_data[2].lower() if user_data[2] else "driver"
+                init_status = user_data[3] if user_data[3] else "Active"
 
-    with col_form_del:
-        with st.form("user_delete_form"):
-            st.write("❌ **โซนอันตราย: ลบพนักงานออกจากระบบ**")
-            user_to_delete = st.selectbox("เลือกรายชื่อที่จะลบทิ้งเด็ดขาด", options=list(user_list_options.keys()))
-            confirm_delete = st.checkbox("⚠️ ยืนยันว่าต้องการลบข้อมูลพนักงานคนนี้จริง ๆ")
-            btn_delete = st.form_submit_button("🗑️ ลบพนักงานออกถาวร")
-            
-            if btn_delete:
-                if confirm_delete and user_to_delete:
-                    target_del_id = user_list_options[user_to_delete][0]
-                    target_del_name = user_list_options[user_to_delete][1]
-                    try:
-                        conn = get_connection()
-                        cursor = conn.cursor()
-                        cursor.execute("SELECT COUNT(*) FROM bookings WHERE driver_id = %s", (target_del_id,))
-                        has_history = cursor.fetchone()[0]
-                        if has_history > 0:
-                            st.error(f"❌ ไม่สามารถลบคุณ {target_del_name} ได้ เนื่องจากมีประวัติการวิ่งงานในระบบแล้ว (แนะนำให้เปลี่ยนสถานะเป็น Inactive แทน เพื่อความปลอดภัยของข้อมูลบัญชี)")
-                        else:
-                            cursor.execute("DELETE FROM users WHERE line_user_id = %s", (target_del_id,))
+            with st.form("user_management_form", clear_on_submit=False):
+                new_line_id = st.text_input("ระบุ LINE User ID", value=init_id).strip()
+                new_name = st.text_input("ระบุชื่อ-นามสกุลจริง ของพนักงาน", value=init_name).strip()
+                roles_pool = ["admin", "booker", "dispatcher", "driver", "airportstaff", "guest"]
+                new_role = st.selectbox("กำหนดตำแหน่ง (Role)", roles_pool, index=roles_pool.index(init_role) if init_role in roles_pool else 3)
+                status_pool = ["Active", "Inactive"]
+                new_status = st.radio("🚦 Status การใช้งานระบบ", status_pool, index=status_pool.index(init_status) if init_status in status_pool else 0, horizontal=True)
+                submit_user = st.form_submit_button("💾 อนุมัติและบันทึกสิทธิ์")
+                
+                if submit_user:
+                    if new_line_id and new_name:
+                        try:
+                            conn = get_connection()
+                            cursor = conn.cursor()
+                            sql = "INSERT INTO users (line_user_id, name, role, status) VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE name = %s, role = %s, status = %s"
+                            cursor.execute(sql, (new_line_id, new_name, new_role, new_status, new_name, new_role, new_status))
                             conn.commit()
-                            st.success(f"🗑️ ลบข้อมูลพนักงานทดสอบคุณ {target_del_name} เรียบร้อยแล้ว!")
+                            cursor.close()
+                            conn.close()
+                            st.success(f"🎉 บันทึกข้อมูลและอัปเดตสถานะพนักงานเรียบร้อยแล้ว!")
                             st.rerun()
-                        cursor.close()
-                        conn.close()
-                    except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
-                else: st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
+                        except Exception as e: st.error(f"❌ เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
+                    else: st.warning("⚠️ รบกวนกรอก LINE ID และชื่อพนักงานให้ครบถ้วนครับ")
+
+        with col_form_del:
+            with st.form("user_delete_form"):
+                st.write("❌ **โซนอันตราย: ลบพนักงานออกจากระบบ**")
+                user_to_delete = st.selectbox("เลือกรายชื่อที่จะลบทิ้งเด็ดขาด", options=list(user_list_options.keys()))
+                confirm_delete = st.checkbox("⚠️ ยืนยันว่าต้องการลบข้อมูลพนักงานคนนี้จริง ๆ")
+                btn_delete = st.form_submit_button("🗑️ ลบพนักงานออกถาวร")
+                
+                if btn_delete:
+                    if confirm_delete and user_to_delete:
+                        target_del_id = user_list_options[user_to_delete][0]
+                        target_del_name = user_list_options[user_to_delete][1]
+                        try:
+                            conn = get_connection()
+                            cursor = conn.cursor()
+                            cursor.execute("SELECT COUNT(*) FROM bookings WHERE driver_id = %s", (target_del_id,))
+                            has_history = cursor.fetchone()[0]
+                            if has_history > 0:
+                                st.error(f"❌ ไม่สามารถลบคุณ {target_del_name} ได้ เนื่องจากมีประวัติการวิ่งงานในระบบแล้ว (แนะนำให้เปลี่ยนสถานะเป็น Inactive แทน เพื่อความปลอดภัยของข้อมูลบัญชี)")
+                            else:
+                                cursor.execute("DELETE FROM users WHERE line_user_id = %s", (target_del_id,))
+                                conn.commit()
+                                st.success(f"🗑️ ลบข้อมูลพนักงานทดสอบคุณ {target_del_name} เรียบร้อยแล้ว!")
+                                st.rerun()
+                            cursor.close()
+                            conn.close()
+                        except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
+                    else: st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
 
 elif choice == "➕ Booker":
     st.title("📋 แบบฟอร์มจองรถ (Booker)")
@@ -224,18 +226,19 @@ elif choice == "➕ Booker":
                 finally: db.close()
 
     st.write("---")
-    st.write("### 🕒 รายการงานจองปัจจุบันของคุณ")
+    st.write("### 🚗 รายการงานจองปัจจุบันที่คุณคีย์ในระบบ")
     try:
         db = get_connection()
         df_booker = pd.read_sql("""
             SELECT voucher_no AS 'Voucher', passenger_name AS 'ชื่อผู้โดยสาร', pickup_location AS 'จุดรับ', 
-                   dropoff_location AS 'จุดส่ง', booking_time AS 'เวลาเดินทาง', status AS 'สถานะ' 
+                   dropoff_location AS 'จุดส่ง', booking_time AS 'เวลาเดินทาง', status AS 'สถานะงาน' 
             FROM bookings WHERE status IN ('Pending', 'Assigned') ORDER BY booking_time ASC
         """, db)
         if not df_booker.empty: st.dataframe(df_booker, width='stretch', hide_index=True)
-        else: st.info("💡 ยังไม่มีรายการงานค้างในระบบ")
+        else: st.info("💡 ปัจจุบันยังไม่มีรายการงานค้างในระบบครับ")
     except Exception as e: st.error(f"❌ ไม่สามารถดึงข้อมูลได้: {e}")
     finally: db.close()
+
 elif choice == "🖥️ Dispatcher":
     st.title("🎛️ แผงควบคุมสำหรับ Dispatcher")
     st.write("---")
@@ -297,6 +300,7 @@ elif choice == "🖥️ Dispatcher":
             
     except Exception as e: st.error(f"Error: {e}")
     finally: db.close()
+
 elif choice == "🚖 งานของฉัน (Driver)":
     st.title("🚖 งานของฉัน (Driver)")
     
@@ -334,7 +338,7 @@ elif choice == "🚖 งานของฉัน (Driver)":
                 if st.button("✅ กดรับทราบและยอมรับงาน"):
                     cursor.execute("UPDATE bookings SET status = 'Accepted' WHERE id = %s", (job_map[selected_job],))
                     db.commit()
-                    # ส่งข้อความกลับไปหา Dispatcher (ถ้ามี)
+                    # ส่งข้อความกลับไปหา Dispatcher
                     send_line_message(f"✅ คนขับ {driver_name} กดรับงานแล้ว!", "dispatcher01") 
                     st.success("รับงานเรียบร้อย!")
                     st.rerun()
@@ -356,6 +360,7 @@ elif choice == "🚖 งานของฉัน (Driver)":
             st.info("ยังไม่มีประวัติการวิ่งงานครับ")
     except Exception as e: st.error(f"Error: {e}")
     finally: db.close()
+
 elif choice == "✈️ Airport Staff":
     st.title("✈️ ตรวจสอบสถานะรถ (Airport Staff)")
     st.subheader("📋 ตารางมอนิเตอร์รถยนต์และคนขับที่กำลังปฏิบัติงาน")
@@ -397,8 +402,8 @@ elif choice == "✈️ Airport Staff":
     except Exception as e: 
         st.error(f"❌ เกิดข้อผิดพลาดในการดึงข้อมูล: {e}")
     finally: 
-        if 'db' in locals() and db.open: db.close()    
-            
+        if 'db' in locals() and db.open: db.close()
+
 elif choice == "📝 ลงทะเบียนพนักงานใหม่":
     st.title("📝 ลงทะเบียนพนักงานใหม่")
     st.write("---")
@@ -453,7 +458,6 @@ elif choice == "📝 ลงทะเบียนพนักงานใหม�
             elif "http" in reg_line_id.lower() or "line.me" in reg_line_id.lower() or len(reg_line_id) < 10 or "*" in reg_line_id:
                 st.error("⚠️ รหัส LINE User ID ไม่ถูกต้อง! กรุณากดปุ่มดึงรหัสและคัดลอกมาวางให้ถูกต้องครับ")
             else:
-                # เปิดคอนเนกชันใหม่เฉพาะตอนกด Submit เพื่อป้องกันปัญหาท่อปิด (Cursor Closed)
                 db_reg = get_connection()
                 try:
                     with db_reg.cursor() as cursor:
