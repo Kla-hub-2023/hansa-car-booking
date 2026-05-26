@@ -398,7 +398,8 @@ elif choice == "✈️ Airport Staff":
     except Exception as e: 
         st.error(f"❌ เกิดข้อผิดพลาดในการดึงข้อมูล: {e}")
     finally: 
-        if 'db' in locals() and db.open: db.close()            
+        if 'db' in locals() and db.open: db.close()    
+            
 elif choice == "📝 ลงทะเบียนพนักงานใหม่":
     st.title("📝 ลงทะเบียนพนักงานใหม่")
     st.write("---")
