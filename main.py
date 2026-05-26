@@ -84,8 +84,8 @@ elif choice == "🏠 Dashboard":
 
     # 2. ส่วนจัดการพนักงาน (แยกการเปิด-ปิด DB เพื่อป้องกัน Cursor closed)
     if user_role == "admin":
-    st.title("👥 ระบบจัดการสิทธิ์ผู้ใช้งาน (User Management)")
-    st.write("---")
+        st.title("👥 ระบบจัดการสิทธิ์ผู้ใช้งาน (User Management)")
+        st.write("---")
     
     st.write("### ⏳ รายชื่อพนักงานใหม่ที่รออนุมัติสิทธิ์ (Guests)")
     try:
