@@ -408,36 +408,66 @@ elif choice == "📝 ลงทะเบียนพนักงานใหม�
     st.title("📝 ลงทะเบียนพนักงานใหม่")
     st.write("---")
     
-    # ส่วนดึง LINE ID ด้วย LIFF (ทำเป็นกล่องคำแนะนำและปุ่มกด)
     st.markdown("### 🔍 วิธีการดึงรหัสประจำตัวเครื่อง")
     st.info("กรุณากดปุ่มสีเขียวด้านล่างเพื่อดึงรหัส LINE User ID อัตโนมัติ แล้วนำมาวางในช่องสมัครครับ 👇")
 
+    # ปรับปรุง JavaScript ปลุก LIFF ให้ทำงานตรงผ่านปุ่ม onclick
     pure_js_html = """
     <div style="background-color:#ffffff; padding:15px; border-radius:8px; border:2px dashed #28a745; text-align:center;">
-        <button id="btn-scan" style="background-color:#28a745; color:white; border:none; padding:12px 24px; font-size:16px; font-weight:bold; border-radius:5px; cursor:pointer; width:100%; max-width:320px;">
+        <button id="btn-scan" onclick="getLineUserId()" style="background-color:#28a745; color:white; border:none; padding:12px 24px; font-size:16px; font-weight:bold; border-radius:5px; cursor:pointer; width:100%; max-width:320px;">
             🟢 ดึง LINE ID ของคุณ
         </button>
         <div id="display-output" style="display:none; margin-top:15px;">
-            <input type="text" id="id-box" style="width:100%; max-width:320px; padding:10px; text-align:center; border:1px solid #ced4da; border-radius:4px;" readonly>
+            <input type="text" id="id-box" style="width:100%; max-width:320px; padding:10px; text-align:center; border:1px solid #ced4da; border-radius:4px; font-size:16px;" readonly>
             <br><br>
-            <button onclick="navigator.clipboard.writeText(document.getElementById('id-box').value); alert('คัดลอกรหัสเรียบร้อยแล้วครับ');" style="background-color:#007bff; color:white; border:none; padding:8px 16px; border-radius:4px; cursor:pointer;">
+            <button onclick="copyToClipboard()" style="background-color:#007bff; color:white; border:none; padding:8px 16px; border-radius:4px; cursor:pointer; font-weight:bold;">
                 📋 คัดลอกรหัส
             </button>
         </div>
     </div>
+    
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script>
-    document.getElementById('btn-scan').addEventListener('click', function() {
+    function getLineUserId() {
+        const btn = document.getElementById('btn-scan');
+        const output = document.getElementById('display-output');
+        const idBox = document.getElementById('id-box');
+        
+        btn.innerText = "⏳ กำลังดึงข้อมูล...";
+        btn.disabled = true;
+
         liff.init({ liffId: "2010148491-zYBksiiv" }).then(() => {
-            liff.getProfile().then(p => {
-                document.getElementById('btn-scan').style.display = 'none';
-                document.getElementById('display-output').style.display = 'block';
-                document.getElementById('id-box').value = p.userId;
-            });
+            if (!liff.isLoggedIn()) {
+                // ถ้าไม่ได้เปิดบนแอป LINE ให้สั่ง Login เพื่อขอสิทธิ์การดึง Profile
+                liff.login();
+            } else {
+                liff.getProfile().then(p => {
+                    btn.style.display = 'none';
+                    output.style.display = 'block';
+                    idBox.value = p.userId;
+                }).catch(err => {
+                    alert("ดึง Profile ล้มเหลว: " + err);
+                    btn.innerText = "🟢 ดึง LINE ID ของคุณ";
+                    btn.disabled = false;
+                });
+            }
         }).catch(err => {
-            alert("เกิดข้อผิดพลาดในการต่อ LIFF: " + err);
+            alert("LIFF เชื่อมต่อไม่สำเร็จ: " + err + "\\nแนะนำให้เปิดลิงก์นี้ในแอป LINE โดยตรงครับ");
+            btn.innerText = "🟢 ดึง LINE ID ของคุณ";
+            btn.disabled = false;
         });
-    });
+    }
+
+    function copyToClipboard() {
+        const idBox = document.getElementById('id-box');
+        idBox.select();
+        idBox.setSelectionRange(0, 99999); // สำหรับมือถือ
+        navigator.clipboard.writeText(idBox.value).then(() => {
+            alert('คัดลอกรหัสเรียบร้อยแล้วครับ สามารถนำไปวางช่องด้านล่างได้เลย');
+        }).catch(err => {
+            alert('ไม่สามารถคัดลอกอัตโนมัติได้ กรุณากดค้างที่ตัวเลขเพื่อคัดลอกเองครับ');
+        });
+    }
     </script>
     """
     components.html(pure_js_html, height=180)
@@ -445,10 +475,9 @@ elif choice == "📝 ลงทะเบียนพนักงานใหม�
     st.write("---")
     st.write("### 👤 กรอกข้อมูลรายงานตัวเพื่อส่งให้แอดมินอนุมัติ")
     
-    # ใช้ Form เพื่อความปลอดภัยในการส่งค่า
     with st.form("guest_register_form", clear_on_submit=True):
         reg_name = st.text_input("1. กรุณากรอก ชื่อ - นามสกุลจริงของคุณ", placeholder="เช่น นายสมชาย ใจดีมาก").strip()
-        reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (รหัสตัว U 33 หลัก)", value=current_id, placeholder="กดดึงรหัสด้านบน แล้วนำมาวางใส่ในช่องนี้ครับ")
+        reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (รหัสตัว U 33 หลัก)", value=current_id, placeholder="กดดึงรหั้านบน แล้วนำมาวางใส่ในช่องนี้ครับ")
         
         submit_reg = st.form_submit_button("🚀 ส่งข้อมูลลงทะเบียนระบบคิวรถ")
         
