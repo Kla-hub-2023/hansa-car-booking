@@ -409,39 +409,27 @@ elif choice == "📝 ลงทะเบียนพนักงานใหม�
     st.write("---")
     
     st.markdown("### 🔍 วิธีการดึงรหัสประจำตัวเครื่อง")
-    st.info("กรุณากดปุ่มสีเขียวด้านล่าง ระบบจะเปิดหน้าต่างใหม่เพื่อดึงรหัส LINE User ID อัตโนมัติอย่างปลอดภัยครับ 👇")
+    st.info("กรุณากดปุ่มสีเขียวด้านล่าง ระบบจะพาท่านไปยังหน้าดึงรหัส LINE User ID อัตโนมัติอย่างปลอดภัยครับ 👇")
 
-    # ปรับปรุง JavaScript ให้ใช้ window.open เปิดหน้าต่างใหม่เต็มจอ ป้องกันการติด iframe (Refused to connect)
+    # ปรับปรุง JavaScript ให้ใช้ window.top.location.href เปลี่ยนหน้าเว็บหลักไปเลยเพื่อเลี่ยง Pop-up Blocker
     pure_js_html = """
     <div style="background-color:#ffffff; padding:15px; border-radius:8px; border:2px dashed #28a745; text-align:center;">
-        <button id="btn-scan" onclick="openLiffWindow()" style="background-color:#28a745; color:white; border:none; padding:12px 24px; font-size:16px; font-weight:bold; border-radius:5px; cursor:pointer; width:100%; max-width:320px;">
-            🟢 กดเปิดหน้าต่างดึง LINE ID
+        <button id="btn-scan" onclick="redirectToLiff()" style="background-color:#28a745; color:white; border:none; padding:12px 24px; font-size:16px; font-weight:bold; border-radius:5px; cursor:pointer; width:100%; max-width:320px;">
+            🟢 กดเพื่อดึง LINE ID ของคุณ
         </button>
-        <div id="display-output" style="display:none; margin-top:15px;">
-            <input type="text" id="id-box" style="width:100%; max-width:320px; padding:10px; text-align:center; border:1px solid #ced4da; border-radius:4px; font-size:16px; font-weight:bold; color:#28a745;" readonly>
-            <br><br>
-            <button onclick="copyId()" style="background-color:#007bff; color:white; border:none; padding:8px 16px; border-radius:4px; cursor:pointer; font-weight:bold;">
-                📋 คัดลอกรหัส
-            </button>
-        </div>
     </div>
     
     <script>
-    function openLiffWindow() {
-        // วาร์ปเปิดหน้าต่างใหม่ไปยังปลายทางของ LINE LIFF โดยตรงเพื่อเลี่ยง iframe บล็อก
-        // แนะนำให้แอดมินนำลิงก์ไลน์แอป (https://liff.line.me/2010148491-zYBksiiv) มาใส่แทนได้เช่นกัน
-        const liffUrl = "https://liff.line.me/2010148491-zYBksiiv";
+    function redirectToLiff() {
+        const liffUrl = "https://liff.line-scdn.net/liff/edge/2/sdk.js";
+        const targetLiff = "https://liff.line.me/2010148491-zYBksiiv";
         
-        // ตรวจสอบว่าเปิดในไลน์แอปหรือไม่ ถ้าเปิดบนเว็บทั่วไปให้เปิดหน้าต่างใหม่เต็มหน้า
-        window.open(liffUrl, '_blank');
-        
-        // โค้ดแสตนด์บายสำหรับรอรับค่ากลับมาแสดงผลในกล่อง
-        // (เมื่อผู้ใช้เปิดจากไลน์แอปหรือส่งค่ากลับเข้ามาตาม parameter)
-        document.getElementById('btn-scan').innerText = "⏳ กรุณาคัดลอกรหัสมาวางในช่องด้านล่าง";
+        // ใช้ window.top เพื่อสั่งให้เบราว์เซอร์หน้าหลักเปลี่ยน URL ไปที่ LIFF ทันที ไม่ติดบล็อกป็อปอัป
+        window.top.location.href = targetLiff;
     }
     </script>
     """
-    components.html(pure_js_html, height=140)
+    components.html(pure_js_html, height=90)
     
     st.write("---")
     st.write("### 👤 กรอกข้อมูลรายงานตัวเพื่อส่งให้แอดมินอนุมัติ")
