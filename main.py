@@ -34,9 +34,16 @@ def check_permission(user_id):
 st.set_page_config(page_title="ระบบจัดการรถ Hunsa", layout="wide")
 
 # --- 3. จัดการสถานะและเมนู ---
-query_params = st.query_params
-if "lineidtoemp" in query_params: st.session_state.default_user_id = query_params["lineidtoemp"].strip()
-elif "user" in query_params: st.session_state.default_user_id = query_params["user"].strip()
+# ดึงค่า LINE ID จาก Query Parameter ใน URL (ถ้ามี)
+q_params = st.query_params
+line_id_from_url = q_params.get("lineidtoemp") or q_params.get("user")
+
+if line_id_from_url:
+    # ตรวจสอบว่าเป็น list หรือ string (เผื่อกรณีเวอร์ชัน Streamlit ต่างกัน)
+    if isinstance(line_id_from_url, list):
+        st.session_state.default_user_id = str(line_id_from_url[0]).strip()
+    else:
+        st.session_state.default_user_id = str(line_id_from_url).strip()
 
 current_id = st.sidebar.text_input("ระบุ LINE User ID", value=st.session_state.get("default_user_id", "")).strip()
 st.session_state.default_user_id = current_id
@@ -339,7 +346,7 @@ elif choice == "🚖 งานของฉัน (Driver)":
                     cursor.execute("UPDATE bookings SET status = 'Accepted' WHERE id = %s", (job_map[selected_job],))
                     db.commit()
                     # ส่งข้อความกลับไปหา Dispatcher
-                    send_line_message(f"✅ คนขับ {driver_name} กดรับงานแล้ว!", "dispatcher01") 
+                    # send_line_message(f"✅ คนขับ {driver_name} กดรับงานแล้ว!", "dispatcher01") 
                     st.success("รับงานเรียบร้อย!")
                     st.rerun()
         else:
@@ -411,22 +418,17 @@ elif choice == "📝 ลงทะเบียนพนักงานใหม�
     st.markdown("### 🔍 วิธีการดึงรหัสประจำตัวเครื่อง")
     st.info("กรุณากดปุ่มสีเขียวด้านล่าง ระบบจะพาท่านไปยังหน้าดึงรหัส LINE User ID อัตโนมัติอย่างปลอดภัยครับ 👇")
 
-    # ใช้ st.link_button ของ Streamlit โดยตรง (ถ้ามี) หรือใช้ <a> tag พร้อม target="_top" เพื่อความเสถียร
+    # ใช้ st.markdown เพื่อสร้างปุ่มที่ทำงานในหน้าหลัก (ไม่ใช้ iframe) เพื่อเลี่ยง Pop-up Blocker และปัญหา Sandbox ใน LINE Browser
     targetLiff = "https://liff.line.me/2010148491-zYBksiiv"
     
-    col_liff, _ = st.columns([1, 1])
-    with col_liff:
-        try:
-            st.link_button("🟢 กดเพื่อดึง LINE ID ของคุณ", targetLiff, use_container_width=True)
-        except AttributeError:
-            liff_link_html = f"""
-            <a href="{targetLiff}" target="_top" style="text-decoration:none;">
-                <div style="background-color:#28a745; color:white; padding:12px 24px; font-size:16px; font-weight:bold; border-radius:5px; text-align:center; cursor:pointer;">
-                    🟢 กดเพื่อดึง LINE ID ของคุณ
-                </div>
-            </a>
-            """
-            components.html(liff_link_html, height=70)
+    st.markdown(f"""
+        <a href="{targetLiff}" target="_top" style="text-decoration:none;">
+            <div style="background-color:#28a745; color:white; padding:15px; border-radius:10px; text-align:center; font-size:18px; font-weight:bold; cursor:pointer; border: 2px solid #1e7e34; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);">
+                🟢 กดเพื่อดึง LINE ID ของคุณ
+            </div>
+        </a>
+        <br>
+    """, unsafe_allow_html=True)
     
     st.write("---")
     st.write("### 👤 กรอกข้อมูลรายงานตัวเพื่อส่งให้แอดมินอนุมัติ")
