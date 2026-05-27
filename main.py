@@ -411,25 +411,22 @@ elif choice == "📝 ลงทะเบียนพนักงานใหม�
     st.markdown("### 🔍 วิธีการดึงรหัสประจำตัวเครื่อง")
     st.info("กรุณากดปุ่มสีเขียวด้านล่าง ระบบจะพาท่านไปยังหน้าดึงรหัส LINE User ID อัตโนมัติอย่างปลอดภัยครับ 👇")
 
-    # ปรับปรุง JavaScript ให้ใช้ window.top.location.href เปลี่ยนหน้าเว็บหลักไปเลยเพื่อเลี่ยง Pop-up Blocker
-    pure_js_html = """
-    <div style="background-color:#ffffff; padding:15px; border-radius:8px; border:2px dashed #28a745; text-align:center;">
-        <button id="btn-scan" onclick="redirectToLiff()" style="background-color:#28a745; color:white; border:none; padding:12px 24px; font-size:16px; font-weight:bold; border-radius:5px; cursor:pointer; width:100%; max-width:320px;">
-            🟢 กดเพื่อดึง LINE ID ของคุณ
-        </button>
-    </div>
+    # ใช้ st.link_button ของ Streamlit โดยตรง (ถ้ามี) หรือใช้ <a> tag พร้อม target="_top" เพื่อความเสถียร
+    targetLiff = "https://liff.line.me/2010148491-zYBksiiv"
     
-    <script>
-    function redirectToLiff() {
-        const liffUrl = "https://liff.line-scdn.net/liff/edge/2/sdk.js";
-        const targetLiff = "https://liff.line.me/2010148491-zYBksiiv";
-        
-        // ใช้ window.top เพื่อสั่งให้เบราว์เซอร์หน้าหลักเปลี่ยน URL ไปที่ LIFF ทันที ไม่ติดบล็อกป็อปอัป
-        window.top.location.href = targetLiff;
-    }
-    </script>
-    """
-    components.html(pure_js_html, height=90)
+    col_liff, _ = st.columns([1, 1])
+    with col_liff:
+        try:
+            st.link_button("🟢 กดเพื่อดึง LINE ID ของคุณ", targetLiff, use_container_width=True)
+        except AttributeError:
+            liff_link_html = f"""
+            <a href="{targetLiff}" target="_top" style="text-decoration:none;">
+                <div style="background-color:#28a745; color:white; padding:12px 24px; font-size:16px; font-weight:bold; border-radius:5px; text-align:center; cursor:pointer;">
+                    🟢 กดเพื่อดึง LINE ID ของคุณ
+                </div>
+            </a>
+            """
+            components.html(liff_link_html, height=70)
     
     st.write("---")
     st.write("### 👤 กรอกข้อมูลรายงานตัวเพื่อส่งให้แอดมินอนุมัติ")
