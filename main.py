@@ -54,9 +54,18 @@ def check_permission(user_id):
 st.set_page_config(page_title="ระบบจัดการรถ Hunsa", layout="wide")
 
 # --- 3. จัดการสถานะและเมนู ---
-# ดึงค่า LINE ID จาก Query Parameter ใน URL (ถ้ามี)
 q_params = st.query_params
-line_id_from_url = q_params.get("lineidtoemp") or q_params.get("user")
+
+# 💡 อัปเกรดดักจับ: เช็คทั้งจาก ?user= , ?lineidtoemp= และดักจับจากค่า state ของ LINE LIFF
+line_id_from_url = q_params.get("user") or q_params.get("lineidtoemp")
+
+# ดักจับเพิ่มกรณีเปิดผ่าน LINE LIFF URL แล้วค่าหลุดไปอยู่ใน liff.state
+if not line_id_from_url and "liff.state" in q_params:
+    liff_state = q_params.get("liff.state")
+    if isinstance(liff_state, list): liff_state = liff_state[0]
+    # ค้นหาคำว่า ?user= หรือ &user= ใน state ของ LIFF
+    if "user=" in liff_state:
+        line_id_from_url = liff_state.split("user=")[1].split("&")[0]
 
 if line_id_from_url:
     if isinstance(line_id_from_url, list):
