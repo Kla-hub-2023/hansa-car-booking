@@ -415,19 +415,23 @@ elif choice == "📝 ลงทะเบียนพนักงานใหม�
     st.title("📝 ลงทะเบียนพนักงานใหม่")
     st.write("---")
     
-    st.markdown("### 🔍 วิธีการดึงรหัสประจำตัวเครื่อง")
-    st.info("กรุณากดปุ่มสีเขียวด้านล่าง ระบบจะพาท่านไปยังหน้าดึงรหัส LINE User ID อัตโนมัติอย่างปลอดภัยครับ 👇")
+    st.markdown("### 🔍 วิธีการดึงรหัสประจำตัวเครื่อง (LINE User ID)")
+    st.info("เนื่องจากระบบความปลอดภัยของเบราว์เซอร์ แนะนำให้กดปุ่มสีเขียวด้านล่างเพื่อเปิดหน้าดึงรหัสเต็มจอผ่านแอป LINE ครับ 👇")
 
-    # ใช้ st.markdown เพื่อสร้างปุ่มที่ทำงานในหน้าหลัก (ไม่ใช้ iframe) เพื่อเลี่ยง Pop-up Blocker และปัญหา Sandbox ใน LINE Browser
-    targetLiff = "https://liff.line.me/2010148491-zYBksiiv"
+    # ใช้ st.link_button ของ Streamlit แท้ๆ เพื่อเปิดหน้าต่างเต็มจอแบบไม่โดนเบราว์เซอร์บล็อกป็อปอัป
+    st.link_button(
+        "🟢 กดเปิดแอป LINE เพื่อดึง User ID ของคุณ", 
+        "https://liff.line.me/2010148491-zYBksiiv",
+        use_container_width=True
+    )
     
-    st.markdown(f"""
-        <a href="{targetLiff}" target="_top" style="text-decoration:none;">
-            <div style="background-color:#28a745; color:white; padding:15px; border-radius:10px; text-align:center; font-size:18px; font-weight:bold; cursor:pointer; border: 2px solid #1e7e34; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);">
-                🟢 กดเพื่อดึง LINE ID ของคุณ
-            </div>
-        </a>
-        <br>
+    st.markdown("""
+    <small style='color: #666;'>
+    💡 <b>ขั้นตอนการใช้งานสำหรับพนักงานใหม่:</b><br>
+    1. กดปุ่มสีเขียวด้านบน ระบบจะเปิดแอป LINE หรือหน้าต่างดึงรหัสอัตโนมัติ<br>
+    2. กดปุ่ม <b>"คัดลอกรหัส"</b> บนหน้าจอคู่มือของ LINE<br>
+    3. กดปุ่มย้อนกลับ (Back) เพื่อกลับมาที่หน้านี้ แล้วนำรหัสมาวางในช่อง <b>"LINE User ID"</b> ด้านล่างครับ
+    </small>
     """, unsafe_allow_html=True)
     
     st.write("---")
@@ -435,7 +439,7 @@ elif choice == "📝 ลงทะเบียนพนักงานใหม�
     
     with st.form("guest_register_form", clear_on_submit=True):
         reg_name = st.text_input("1. กรุณากรอก ชื่อ - นามสกุลจริงของคุณ", placeholder="เช่น นายสมชาย ใจดีมาก").strip()
-        reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (รหัสตัว U 33 หลัก)", value=current_id if current_id else "", placeholder="นำรหัสตัว U 33 หลักมาวางใส่ในช่องนี้ครับ")
+        reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (รหัสตัว U 33 หลัก)", value=current_id if current_id else "", placeholder="นำรหัสตัว U 33 หลักที่คัดลอกมาวางใส่ในช่องนี้ครับ")
         
         submit_reg = st.form_submit_button("🚀 ส่งข้อมูลลงทะเบียนระบบคิวรถ")
         
