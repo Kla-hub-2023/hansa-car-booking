@@ -7,13 +7,18 @@ import streamlit.components.v1 as components
 
 # --- 1. เชื่อมต่อฐานข้อมูล ---
 def get_connection():
-    return pymysql.connect(
-        host='mysql-22653bef-kla-e55d.c.aivencloud.com',
-        user='avnadmin',
-        password='AVNS_W4Huwc3abQww6NKNlG2',
-        database='defaultdb',
-        port=23986
-    )
+    try:
+        return pymysql.connect(
+            host='mysql-22653bef-kla-e55d.c.aivencloud.com',
+            user='avnadmin',
+            password='AVNS_W4Huwc3abQww6NKNlG2', # เปลี่ยนเป็นรหัสผ่านล่าสุดที่ก๊อปปี้มาจากเว็บ Aiven
+            database='defaultdb',
+            port=23986,
+            connect_timeout=5 # ตั้งเวลา Timeout ไว้ 5 วินาทีไม่ให้หน้าเว็บค้าง
+        )
+    except pymysql.MySQLError as e:
+        st.error(f"❌ ไม่สามารถเชื่อมต่อฐานข้อมูลได้: กรุณาตรวจสอบรหัสผ่านหรือสถานะของฐานข้อมูลบน Aiven (Error: {e})")
+        st.stop() # สั่งให้ Streamlit หยุดทำงานตรงนี้ ไม่ให้รันโค้ดส่วนอื่นต่อจนพัง
 
 # --- 2. ฟังก์ชันตรวจสอบสิทธิ์ ---
 def check_permission(user_id):
