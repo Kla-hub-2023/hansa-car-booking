@@ -415,41 +415,12 @@ elif choice == "📝 ลงทะเบียนพนักงานใหม�
     st.title("📝 ลงทะเบียนพนักงานใหม่")
     st.write("---")
     
-    st.markdown("### 🔍 วิธีการดึงรหัสประจำตัวเครื่อง (LINE User ID)")
-    
-    col_info, col_qr = st.columns([2, 1])
-    
-    with col_info:
-        st.info("💡 **กรุณาเลือกทำวิธีใดวิธีหนึ่งด้านล่างนี้เพื่อดึงรหัสครับ**")
-        st.markdown("""
-        **วิธีที่ 1: เปิดลิงก์โดยตรง (แนะนำสำหรับมือถือ)**
-        * ให้กดค้างที่ลิงก์ด้านล่างนี้ แล้วเลือก **'เปิดในแอปอื่น'** หรือ **'เปิดด้วย LINE'** ครับ
-        * ลิงก์ตรง: https://liff.line.me/2010148491-zYBksiiv
-        
-        **วิธีที่ 2: สแกน QR Code (สะดวกเมื่อเปิดเว็บบนคอม)**
-        * ใช้กล้องมือถือ หรือฟังก์ชันสแกนในแอป LINE สแกนคิวอาร์โค้ดด้านข้างได้เลยครับ
-        """)
-        
-    with col_qr:
-        # แสดง QR Code เพื่อให้สแกนกระโดดเข้าแอป LINE โดยตรง ไม่ผ่านบราวเซอร์ของ Streamlit
-        st.image(
-            "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://liff.line.me/2010148491-zYBksiiv",
-            caption="สแกนเพื่อดึง LINE ID",
-            use_container_width=False
-        )
-        
-    st.markdown("""
-    <small style='color: #666;'>
-    เมื่อเข้าแอป LINE และกด <b>"คัดลอกรหัส"</b> เรียบร้อยแล้ว ให้กดปุ่มย้อนกลับมาที่หน้านี้ แล้วนำรหัสตัว U 33 หลัก มาวางในช่องด้านล่างเพื่อสมัครได้เลยครับ
-    </small>
-    """, unsafe_allow_html=True)
-    
-    st.write("---")
-    st.write("### 👤 กรอกข้อมูลรายงานตัวเพื่อส่งให้แอดมินอนุมัติ")
+    st.markdown("### 👤 กรอกข้อมูลรายงานตัวเพื่อส่งให้แอดมินอนุมัติ")
+    st.info("💡 กรุณากดปุ่มดึงรหัสในแอป LINE (Rich Menu หรือข้อความปักหมุด) แล้วนำรหัสตัว U 33 หลักมาวางด้านล่างนี้ครับ")
     
     with st.form("guest_register_form", clear_on_submit=True):
         reg_name = st.text_input("1. กรุณากรอก ชื่อ - นามสกุลจริงของคุณ", placeholder="เช่น นายสมชาย ใจดีมาก").strip()
-        reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (รหัสตัว U 33 หลัก)", value=current_id if current_id else "", placeholder="นำรหัสตัว U 33 หลักที่คัดลอกมาวางใส่ในช่องนี้ครับ")
+        reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (รหัสตัว U 33 หลัก)", value=current_id if current_id else "", placeholder="วางรหัสตัว U ที่คัดลอกมาที่นี่ครับ")
         
         submit_reg = st.form_submit_button("🚀 ส่งข้อมูลลงทะเบียนระบบคิวรถ")
         
@@ -457,7 +428,7 @@ elif choice == "📝 ลงทะเบียนพนักงานใหม�
             if not reg_name or not reg_line_id:
                 st.error("⚠️ กรุณากรอกชื่อและรหัส LINE ID ให้ครบถ้วนก่อนกดส่งข้อมูลครับ")
             elif "http" in reg_line_id.lower() or "line.me" in reg_line_id.lower() or len(reg_line_id) < 10 or "*" in reg_line_id:
-                st.error("⚠️ รหัส LINE User ID ไม่ถูกต้อง! กรุณานำรหัสตัว U มาวางให้ถูกต้องครับ")
+                st.error("⚠️ รหัส LINE User ID ไม่ถูกต้อง! กรุณานำเฉพาะรหัสตัว U มาวางให้ถูกต้องครับ")
             else:
                 db_reg = get_connection()
                 try:
