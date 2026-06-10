@@ -99,15 +99,20 @@ elif user_role == "airportstaff":
 else: 
     menu_options = ["📝 ลงทะเบียนพนักงานใหม่"]
 
-# ป้องกันบั๊กกรณีเมนูเก่าค้างใน session_state ของระดับสิทธิ์อื่น
-if "current_menu_choice" not in st.session_state or st.session_state["current_menu_choice"] not in menu_options: 
+# 💡 [แก้ไขใหม่] ล้างค่าเมนูเก่า และล็อคเมนูให้ตรงกับระดับสิทธิ์แบบปลอดภัย 100%
+if user_role == "guest":
+    st.session_state["current_menu_choice"] = "📝 ลงทะเบียนพนักงานใหม่"
+    menu_options = ["📝 ลงทะเบียนพนักงานใหม่"]
+elif "current_menu_choice" not in st.session_state or st.session_state["current_menu_choice"] not in menu_options: 
     st.session_state["current_menu_choice"] = menu_options[0]
 
-choice = st.sidebar.radio(
-    "เมนูใช้งาน", 
-    options=menu_options, 
-    index=menu_options.index(st.session_state["current_menu_choice"])
-)
+# ตรวจสอบค่า index แบบปลอดภัย ไม่ให้เกิด IndexError
+try:
+    menu_index = menu_options.index(st.session_state["current_menu_choice"])
+except ValueError:
+    menu_index = 0
+
+choice = st.sidebar.radio("เมนูใช้งาน", options=menu_options, index=menu_index)
 st.session_state["current_menu_choice"] = choice
 
 # เช็คตัดหน้ากลับเฉพาะผู้ใช้งานที่เป็น Driver เท่านั้น เพื่อป้องกันเมนูค้างหน้าอื่น
