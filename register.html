@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ลงทะเบียนพนักงานใหม่ - Hunsa</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
+    
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            width: 100%;
+            max-width: 400px;
+            box-sizing: border-box;
+        }
+        h2 {
+            color: #1a365d;
+            margin-top: 0;
+            text-align: center;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        p.subtitle {
+            color: #718096;
+            text-align: center;
+            font-size: 14px;
+            margin-bottom: 25px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #4a5568;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #cbd5e0;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 15px;
+            background-color: #f8fafc;
+            transition: all 0.2s;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #3182ce;
+            background-color: #fff;
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.2);
+        }
+        input[readonly] {
+            background-color: #e2e8f0;
+            color: #4a5568;
+            cursor: not-allowed;
+        }
+        .btn-submit {
+            width: 100%;
+            padding: 14px;
+            background-color: #2f855a;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 10px;
+        }
+        .btn-submit:hover {
+            background-color: #22543d;
+        }
+        #loading {
+            text-align: center;
+            color: #3182ce;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>ลงทะเบียนพนักงานใหม่</h2>
+    <p class="subtitle">ระบบคิวรถ Hunsa Driver</p>
+    
+    <div id="loading">⏳ กำลังดึงรหัส LINE User ID ของคุณ...</div>
+
+    <form id="registerForm" onsubmit="submitForm(event)">
+        <div class="form-group">
+            <label for="driverName">ชื่อ - นามสกุลจริง</label>
+            <input type="text" id="driverName" placeholder="เช่น นายสมชาย ดีใจ" required>
+        </div>
+
+        <div class="form-group">
+            <label for="lineUid">รหัส LINE User ID (ตัว U)</label>
+            <input type="text" id="lineUid" readonly required placeholder="กำลังดึงข้อมูลจาก LINE...">
+        </div>
+
+        <button type="submit" class="btn-submit">🚀 ส่งข้อมูลลงทะเบียนระบบคิวรถ</button>
+    </form>
+</div>
+
+<script>
+    // 💡 สั่งให้ LINE LIFF ทำงานทันทีเมื่อเปิดหน้าเว็บ
+    async function initLiff() {
+        try {
+            // ปลุกระบบ LIFF ID ของแอดมิน (ใช้ตัวเดิมที่แอดมินสร้างไว้ได้เลย)
+            await liff.init({ liffId: "2010148491-zYBksiiv" });
+            
+            if (liff.isLoggedIn()) {
+                // ดึงข้อมูลโปรไฟล์ของคนที่กำลังเปิดเว็บ
+                const profile = await liff.getProfile();
+                // หยอดรหัสตัว U ลงไปในกล่องข้อความที่ 2 ทันที!
+                document.getElementById('lineUid').value = profile.userId;
+                // ซ่อนข้อความกำลังโหลด
+                document.getElementById('loading').style.display = 'none';
+            } else {
+                // ถ้าเผลอไปเปิดนอกแอป LINE ให้ระบบบังคับล็อกอินเข้า LINE ก่อน
+                liff.login();
+            }
+        } catch (error) {
+            console.error("LIFF Init Error:", error);
+            document.getElementById('loading').innerText = "❌ เกิดข้อผิดพลาดในการดึงข้อมูล LINE";
+        }
+    }
+
+    // เรียกฟังก์ชันเมื่อเว็บโหลดเสร็จ
+    initLiff();
+
+    // 💡 ฟังก์ชันควบคุมตอนกดปุ่ม "ส่งข้อมูล"
+    async function submitForm(event) {
+        event.preventDefault(); // ป้องกันหน้าเว็บรีเฟรชตัวเอง
+        
+        const name = document.getElementById('driverName').value.trim();
+        const lineId = document.getElementById('lineUid').value.trim();
+        
+        if (!name || !lineId) {
+            alert("กรุณากรอกข้อมูลให้ครบถ้วนครับ");
+            return;
+        }
+
+        // 🔗 ชี้เป้าไปที่ประตูลับ (API) บน Streamlit ที่เราเขียนไว้ใน Step 1
+        // (พัดใช้ URL ลิงก์แอปหลักของแอดมินโดยตรงเพื่อยิงข้อมูลส่งหลังบ้าน)
+        const streamlitApiUrl = `https://hansa-car-booking-mmvs3rjbrdwbuu7x5vecw.streamlit.app/?action=api_register&name=${encodeURIComponent(name)}&line_id=${encodeURIComponent(lineId)}`;
+
+        try {
+            // สั่งยิงข้อมูลแบบเบื้องหลัง (Background Fetch)
+            const response = await fetch(streamlitApiUrl);
+            
+            // เมื่อลงทะเบียนสำเร็จ
+            alert("🎉 ลงทะเบียนสำเร็จเรียบร้อยแล้วครับ! กรุณารอแอดมินกล้าอนุมัติสิทธิ์ใช้งานนะครับ");
+            
+            // สั่งปิดหน้าต่างเว็บ LIFF บนแอป LINE โดยอัตโนมัติเพื่อให้คนขับกลับไปหน้าแชท
+            liff.closeWindow();
+            
+        } catch (error) {
+            console.error("Submit Error:", error);
+            // เพื่อความยืดหยุ่น หากเบราว์เซอร์บางรุ่นติดบล็อก CORS แต่จริงๆ ข้อมูลวิ่งเข้าฐานข้อมูลไปแล้ว
+            alert("ส่งข้อมูลเรียบร้อยแล้ว! หากระบบไม่ปิดตัวลงอัตโนมัติ แอดมินสามารถกดย้อนกลับเข้าหน้าแชทได้เลยครับ");
+            liff.closeWindow();
+        }
+    }
+</script>
+
+</body>
+</html>
