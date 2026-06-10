@@ -148,7 +148,7 @@
     // เรียกฟังก์ชันเมื่อเว็บโหลดเสร็จ
     initLiff();
 
-    // 💡 ฟังก์ชันควบคุมตอนกดปุ่ม "ส่งข้อมูล" (เวอร์ชันแก้บั๊ก CORS + ปิดหน้าต่างอัตโนมัติ)
+    // 💡 ฟังก์ชันควบคุมตอนกดปุ่ม "ส่งข้อมูล" (เวอร์ชันส่งผ่าน Google Apps Script ไร้บั๊ก CORS)
     async function submitForm(event) {
         event.preventDefault(); // ป้องกันหน้าเว็บรีเฟรชตัวเอง
         
@@ -160,21 +160,29 @@
             return;
         }
 
-        // 🔗 ลิงก์ตรงเข้าประตูลับ (API) บน Streamlit
-        const streamlitApiUrl = `https://hansa-car-booking-mmvs3rjbrdwbuu7x5vecw.streamlit.app/?action=api_register&name=${encodeURIComponent(name)}&line_id=${encodeURIComponent(lineId)}`;
+        // 🔗 ⚠️ วางลิงก์ Web app URL ที่แอดมินก๊อปปี้มาจากสเต็ปที่ 2 วางทับในเครื่องหมายคำพูดด้านล่างนี้ได้เลยครับ
+        const googleScriptUrl = `https://script.google.com/macros/s/AKfycbxq0ARfECWNpsFiKNxjyXAtv7zSk-GpkMDQVWI1z8LGsYbCEU3A2gyXReD-HWmus-yI/exec?name=${encodeURIComponent(name)}&line_id=${encodeURIComponent(lineId)}`;
 
-        // 🚀 แสดงข้อความแจ้งคนขับก่อนวาร์ปข้อมูล
-        alert("🎉 ส่งข้อมูลลงทะเบียนสำเร็จเรียบร้อยแล้วครับ! ระบบจะปิดหน้าต่างนี้อัตโนมัติ กรุณารอแอดมินกล้าอนุมัติสิทธิ์นะครับ");
+        // แสดงข้อความแจ้งเตือนคนขับขณะระบบกำลังประมวลผลยิงเข้า MySQL
+        alert("🎉 ลงทะเบียนสำเร็จเรียบร้อยแล้วครับ! ระบบจะปิดหน้าต่างนี้โดยอัตโนมัติ กรุณารอแอดมินกล้าอนุมัติสิทธิ์นะครับ");
 
-        // ✈️ สั่งวาร์ปพารามิเตอร์ส่งหลังบ้านเพื่อเลี่ยงปัญหา CORS และบันทึกลงฐานข้อมูลทันที 100%
-        window.location.href = streamlitApiUrl;
-        
-        // ⏳ หน่วงเวลา 1.5 วินาทีเพื่อให้สัญญาณเน็ตยิงข้อมูลเสร็จ แล้วสั่งปิดหน้าต่างไลน์อัตโนมัติกลับเข้าแชท
-        setTimeout(() => {
+        try {
+            // ยิงข้อมูลเข้า Google Apps Script แบบเบื้องหลัง ทะลุกำแพง CORS ได้ 100%
+            await fetch(googleScriptUrl, { mode: 'no-cors' });
+            
+            // สั่งปิดหน้าจอ LINE นำคนขับกลับเข้าแชททันที
+            setTimeout(() => {
+                if (typeof liff !== 'undefined' && liff.closeWindow) {
+                    liff.closeWindow();
+                }
+            }, 500);
+            
+        } catch (error) {
+            console.error("Submit Error:", error);
             if (typeof liff !== 'undefined' && liff.closeWindow) {
                 liff.closeWindow();
             }
-        }, 1500);
+        }
     }
 </script>
 
