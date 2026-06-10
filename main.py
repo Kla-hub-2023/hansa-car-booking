@@ -515,3 +515,45 @@ elif choice == "📝 ลงทะเบียนพนักงานใหม�
                     st.error(f"❌ เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
                 finally:
                     if db_reg and db_reg.open: db_reg.close()
+# =================================================================
+# 🚪 [เพิ่มใหม่] ประตูลับ (API Endpoint) สำหรับรับข้อมูลจากหน้าเว็บ GitHub Pages
+# =================================================================
+
+# ตรวจสอบว่าหน้าเว็บ HTML ยิงข้อมูลสมัครงานเข้ามาแบบเบื้องหลังหรือไม่
+# เราจะใช้ระบบดักจับผ่าน Query Parameter ที่ชื่อว่า "action"
+
+if "action" in q_params and q_params.get("action") == "api_register":
+    # 1. ดึงข้อมูลที่หน้าเว็บ HTML ส่งมา
+    api_name = q_params.get("name")
+    api_line_id = q_params.get("line_id")
+    
+    # แปลงค่ากรณีส่งมาเป็น list ให้กลายเป็น string
+    if isinstance(api_name, list): api_name = api_name[0]
+    if isinstance(api_line_id, list): api_line_id = api_line_id[0]
+    
+    if api_name and api_line_id:
+        db_api = None
+        try:
+            db_api = get_connection()
+            with db_api.cursor() as cursor:
+                sql_api = """
+                    INSERT INTO users (line_user_id, name, role, status)
+                    VALUES (%s, %s, 'guest', 'Active')
+                    ON DUPLICATE KEY UPDATE name = %s, role = 'guest', status = 'Active'
+                """
+                cursor.execute(sql_api, (api_line_id, api_name, api_name))
+            db_api.commit()
+            
+            # ส่งสัญญาณตอบกลับหน้าเว็บ HTML ว่า "บันทึกสำเร็จ!"
+            st.write('{"status": "success", "message": "Register complete"}')
+            st.stop() # หยุดการทำงานของหน้าเว็บ Streamlit ทันที ไม่ต้องโหลดหน้าจอปกติ
+            
+        except Exception as e:
+            st.write(f'{{"status": "error", "message": "{str(e)}"}}')
+            st.stop()
+        finally:
+            if db_api and db_api.open: 
+                db_api.close()
+    else:
+        st.write('{"status": "error", "message": "Missing arguments"}')
+        st.stop()
