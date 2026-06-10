@@ -53,6 +53,26 @@ def check_permission(user_id):
 
 st.set_page_config(page_title="ระบบจัดการรถ Hunsa", layout="wide")
 
+# --- ฟังก์ชันส่งข้อความแจ้งเตือนผ่าน LINE (Push Message) ---
+def send_line_message(message, target_line_id):
+    if not target_line_id or target_line_id.startswith("GUEST_"): 
+        return # ป้องกันแอร์เรอร์กรณีคนกดไม่มีรหัสไลน์จริง
+        
+    url = 'https://api.line.me/v2/bot/message/push'
+    headers = {
+        'Content-Type': 'application/json',
+        # ⚠️ ซ่อมแซมเรียบร้อย: ลบเว้นวรรคส่วนเกินใน Token ออกให้เรียบร้อยแล้วครับ
+        'Authorization': 'Bearer X8ogM3D2GxzZ3z5EBMdOxWTa4BjTlqP1H/bYv+fwqLGNiKhhxuiPQR5bakcgXfEZBUPNDImDlvLrDMvtqN0/8XTlrcqfIvti2m2RpY/wrbQ9xl95HJd+slpzHCM9Vs5SxNS5e9gBG4MSE71UUNhXrQdB04t89/1O/w1cDnyilFU='
+    }
+    data = {
+        'to': target_line_id,  # รหัสตัว U ปลายทางที่ต้องการให้ไลน์เด้งเตือน
+        'messages': [{'type': 'text', 'text': message}]
+    }
+    try:
+        requests.post(url, headers=headers, json=data, timeout=5)
+    except Exception as e:
+        st.error(f"ระบบส่งแจ้งเตือน LINE ขัดข้อง: {e}")
+        
 # --- 3. จัดการสถานะและเมนู ---
 q_params = st.query_params
 
@@ -355,6 +375,12 @@ elif choice == "🖥️ Dispatcher":
                     cursor.execute("UPDATE bookings SET driver_id = %s, status = 'Assigned' WHERE id = %s", 
                                    (driver_options[sel_driver], job_map[sel_job]))
                     db.commit()
+                    
+                    # 💡 สั่งให้ไลน์เด้งเตือนที่มือถือคนขับรถทันทีที่จ่ายงาน!
+                    driver_u_id = driver_options[sel_driver] 
+                    job_name = sel_job 
+                    send_line_message(f"🚖 มีงานใหม่มอบหมายถึงคุณ!\nเลขใบงาน: {job_name}\nกรุณาเข้าแอปเพื่อกดรับทราบงานด้วยครับ", driver_u_id)
+
                     st.success("จ่ายงานเรียบร้อย!")
                     st.rerun()
 
@@ -386,7 +412,7 @@ elif choice == "🚖 งานของฉัน (Driver)":
     db = None
     try:
         db = get_connection()
-        cursor = db.cursor() # 💡 แก้ไข: เพิ่มคำสั่งประกาศสิทธิ์ cursor ป้องกันบั๊กตอนกดรับงานย่อหน้าด้านล่าง
+        cursor = db.cursor() 
         
         # 1. ดึงชื่อคนขับ
         cursor.execute("SELECT name FROM users WHERE line_user_id = %s", (current_id,))
@@ -411,12 +437,21 @@ elif choice == "🚖 งานของฉัน (Driver)":
             if not assigned_jobs.empty:
                 st.write("---")
                 st.write("### 📥 งานใหม่รอรับทราบ")
-                job_map = {f"🎫 {row['voucher_no']} | ลูกค้า {row['passenger_name']}": row['id'] for _, row in assigned_jobs.iterrows()}
+                
+                # เก็บเฉพาะเลข Voucher ไปใช้งานเพื่อให้โค้ดอ่านง่ายและไม่เอ๋อ
+                job_map = {f"🎫 {row['voucher_no']} | ลูกค้า {row['passenger_name']}": (row['id'], row['voucher_no']) for _, row in assigned_jobs.iterrows()}
                 selected_job = st.selectbox("เลือกงานที่ต้องการรับ", list(job_map.keys()))
                 
                 if st.button("✅ กดรับทราบและยอมรับงาน"):
-                    cursor.execute("UPDATE bookings SET status = 'Accepted' WHERE id = %s", (job_map[selected_job],))
+                    target_job_id = job_map[selected_job][0]
+                    target_voucher = job_map[selected_job][1]
+                    
+                    cursor.execute("UPDATE bookings SET status = 'Accepted' WHERE id = %s", (target_job_id,))
                     db.commit()
+                    
+                    # 💡 แก้ไขเรียบร้อย: ลบวงเล็บปีกกาครอบตัวแปรปลายทางออก เพื่อส่งแจ้งเตือนแบบ String ได้ถูกต้อง
+                    send_line_message(f"✅ คนขับ '{driver_name}' กดรับทราบงาน Voucher: {target_voucher} เรียบร้อยแล้วครับ!", current_id)
+
                     st.success("รับงานเรียบร้อย!")
                     st.rerun()
         else:
@@ -427,7 +462,7 @@ elif choice == "🚖 งานของฉัน (Driver)":
     finally: 
         if db and db.open: db.close()
 
-    # 3. ส่วนประวัติการวิ่งงาน
+# --- 3. ส่วนประวัติการวิ่งงาน ---
     st.write("---")
     st.write("### ✅ ประวัติการวิ่งงาน (Completed)")
     db = None
@@ -520,19 +555,14 @@ elif choice == "📝 ลงทะเบียนพนักงานใหม�
                     st.error(f"❌ เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
                 finally:
                     if db_reg and db_reg.open: db_reg.close()
-# =================================================================
-# 🚪 [เพิ่มใหม่] ประตูลับ (API Endpoint) สำหรับรับข้อมูลจากหน้าเว็บ GitHub Pages
-# =================================================================
 
-# ตรวจสอบว่าหน้าเว็บ HTML ยิงข้อมูลสมัครงานเข้ามาแบบเบื้องหลังหรือไม่
-# เราจะใช้ระบบดักจับผ่าน Query Parameter ที่ชื่อว่า "action"
-
+# =================================================================
+# 🚪 ประตูลับ (API Endpoint) สำหรับรับข้อมูลจากหน้าเว็บ GitHub Pages
+# =================================================================
 if "action" in q_params and q_params.get("action") == "api_register":
-    # 1. ดึงข้อมูลที่หน้าเว็บ HTML ส่งมา
     api_name = q_params.get("name")
     api_line_id = q_params.get("line_id")
     
-    # แปลงค่ากรณีส่งมาเป็น list ให้กลายเป็น string
     if isinstance(api_name, list): api_name = api_name[0]
     if isinstance(api_line_id, list): api_line_id = api_line_id[0]
     
@@ -549,9 +579,8 @@ if "action" in q_params and q_params.get("action") == "api_register":
                 cursor.execute(sql_api, (api_line_id, api_name, api_name))
             db_api.commit()
             
-            # ส่งสัญญาณตอบกลับหน้าเว็บ HTML ว่า "บันทึกสำเร็จ!"
             st.write('{"status": "success", "message": "Register complete"}')
-            st.stop() # หยุดการทำงานของหน้าเว็บ Streamlit ทันที ไม่ต้องโหลดหน้าจอปกติ
+            st.stop()
             
         except Exception as e:
             st.write(f'{{"status": "error", "message": "{str(e)}"}}')
