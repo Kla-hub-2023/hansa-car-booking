@@ -148,9 +148,9 @@
     // เรียกฟังก์ชันเมื่อเว็บโหลดเสร็จ
     initLiff();
 
-    // 💡 ฟังก์ชันควบคุมตอนกดปุ่ม "ส่งข้อมูล" (เวอร์ชันส่งผ่าน Google Apps Script ไร้บั๊ก CORS)
+// 💡 ฟังก์ชันควบคุมตอนกดปุ่ม "ส่งข้อมูล" (เวอร์ชันดักเคสลงทะเบียนซ้ำ)
     async function submitForm(event) {
-        event.preventDefault(); // ป้องกันหน้าเว็บรีเฟรชตัวเอง
+        event.preventDefault();
         
         const name = document.getElementById('driverName').value.trim();
         const lineId = document.getElementById('lineUid').value.trim();
@@ -160,17 +160,24 @@
             return;
         }
 
-        // 🔗 ⚠️ วางลิงก์ Web app URL ที่แอดมินก๊อปปี้มาจากสเต็ปที่ 2 วางทับในเครื่องหมายคำพูดด้านล่างนี้ได้เลยครับ
         const googleScriptUrl = `https://script.google.com/macros/s/AKfycbxq0ARfECWNpsFiKNxjyXAtv7zSk-GpkMDQVWI1z8LGsYbCEU3A2gyXReD-HWmus-yI/exec?name=${encodeURIComponent(name)}&line_id=${encodeURIComponent(lineId)}`;
 
-        // แสดงข้อความแจ้งเตือนคนขับขณะระบบกำลังประมวลผลยิงเข้า MySQL
-        alert("🎉 ลงทะเบียนสำเร็จเรียบร้อยแล้วครับ! ระบบจะปิดหน้าต่างนี้โดยอัตโนมัติ กรุณารอแอดมินกล้าอนุมัติสิทธิ์นะครับ");
-
         try {
-            // ยิงข้อมูลเข้า Google Apps Script แบบเบื้องหลัง ทะลุกำแพง CORS ได้ 100%
-            await fetch(googleScriptUrl, { mode: 'no-cors' });
+            // ปรับวิธีส่งจาก no-cors เป็น cors เพื่อให้หน้าบ้านสามารถอ่านคำตอบกลับจากกูเกิลได้ว่า "ซ้ำ" หรือไม่
+            const response = await fetch(googleScriptUrl);
+            const result = await response.json();
             
-            // สั่งปิดหน้าจอ LINE นำคนขับกลับเข้าแชททันที
+            if (result.status === "duplicate") {
+                // 🚨 กรณีตรวจเจอข้อมูลตัว U ซ้ำในฐานข้อมูล
+                alert("⚠️ ขออภัยครับ! คุณเคยลงทะเบียนในระบบคิวรถ Hunsa เรียบร้อยแล้ว ไม่ต้องลงทะเบียนซ้ำครับ");
+            } else if (result.status === "success") {
+                // 🎉 กรณีเป็นคนขับใหม่ ลงทะเบียนผ่านครั้งแรก
+                alert("🎉 ลงทะเบียนสำเร็จเรียบร้อยแล้วครับ! ระบบจะปิดหน้าต่างนี้โดยอัตโนมัติ กรุณารอแอดมินกล้าอนุมัติสิทธิ์นะครับ");
+            } else {
+                alert("❌ เกิดข้อผิดพลาดทางเทคนิค กรุณาแจ้งแอดมินกล้าครับ");
+            }
+            
+            // สั่งสลายตัวปิดหน้าต่าง LINE ทันทีในทั้งสองกรณี
             setTimeout(() => {
                 if (typeof liff !== 'undefined' && liff.closeWindow) {
                     liff.closeWindow();
@@ -179,6 +186,7 @@
             
         } catch (error) {
             console.error("Submit Error:", error);
+            // เพื่อป้องกันหน้าจอค้าง หากระบบติดต่อหลังบ้านไม่ได้ ให้ปิดหน้าต่างเซฟไว้ก่อน
             if (typeof liff !== 'undefined' && liff.closeWindow) {
                 liff.closeWindow();
             }
