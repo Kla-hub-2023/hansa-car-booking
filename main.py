@@ -52,6 +52,44 @@ def check_permission(user_id):
             db.close()
 
 st.set_page_config(page_title="ระบบจัดการรถ Hunsa", layout="wide")
+# =================================================================
+# 🎨 [เพิ่มใหม่] สไตล์ CSS ปรับขนาดตัวอักษรให้พอเหมาะกับหน้าจอมือถือ
+# =================================================================
+st.markdown("""
+    <style>
+    /* ควบคุมขนาดตัวอักษรเมื่อเปิดบนหน้าจอมือถือ (ความกว้างไม่เกิน 768px) */
+    @media (max-width: 768px) {
+        /* ปรับขนาดหัวข้อใหญ่ (h1) เช่น Dashboard, แผงควบคุม */
+        .stHtmlBlock h1, h1 {
+            font-size: 22px !important;
+            font-weight: 700 !important;
+            margin-bottom: 10px !important;
+        }
+        /* ปรับขนาดหัวข้อย่อย (h2, h3) เช่น ข้อมูลการเดินทาง, ตารางสถานะงาน */
+        .stHtmlBlock h2, h2, .stHtmlBlock h3, h3 {
+            font-size: 18px !important;
+            font-weight: 600 !important;
+        }
+        /* ปรับขนาดป้ายกำกับ Metric (ตัวหนังสือด้านบนตัวเลข) */
+        [data-testid="stMetricLabel"] {
+            font-size: 13px !important;
+        }
+        /* ปรับขนาดตัวเลข Metric ให้พอดี ไม่ใหญ่จนค้างคาหน้าจอ */
+        [data-testid="stMetricValue"] {
+            font-size: 26px !important;
+            font-weight: 700 !important;
+        }
+        /* ปรับขนาดตัวหนังสือทั่วไปในฟอร์มและปุ่มกด */
+        .stButton button, .stSelectbox label, .stTextInput label, p {
+            font-size: 14px !important;
+        }
+        /* จัดการขนาดตัวอักษรในตาราง Dataframe ให้กระชับสายตา */
+        .stDataFrame div, table th, table td {
+            font-size: 12px !important;
+        }
+    }
+    </style>
+""", unsafe_allow_index=False, unsafe_allow_html=True)
 
 # --- ฟังก์ชันส่งข้อความแจ้งเตือนผ่าน LINE (Push Message) ---
 def send_line_message(message, target_line_id):
