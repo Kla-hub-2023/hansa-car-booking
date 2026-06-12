@@ -47,9 +47,10 @@ def check_permission(user_id):
             return "guest"
     except: 
         return "guest"
-    finally: 
-        if db and db.open:
-            db.close()
+    final_res = "guest"
+    if db and db.open:
+        db.close()
+    return "guest" if not 'res' in locals() or not res else str(res[0]).lower()
 
 st.set_page_config(page_title="ระบบจัดการรถ Hunsa", layout="wide")
 # =================================================================
@@ -99,7 +100,6 @@ def send_line_message(message, target_line_id):
     url = 'https://api.line.me/v2/bot/message/push'
     headers = {
         'Content-Type': 'application/json',
-        # ⚠️ ซ่อมแซมเรียบร้อย: ลบเว้นวรรคส่วนเกินใน Token ออกให้เรียบร้อยแล้วครับ
         'Authorization': 'Bearer X8ogM3D2GxzZ3z5EBMdOxWTa4BjTlqP1H/bYv+fwqLGNiKhhxuiPQR5bakcgXfEZBUPNDImDlvLrDMvtqN0/8XTlrcqfIvti2m2RpY/wrbQ9xl95HJd+slpzHCM9Vs5SxNS5e9gBG4MSE71UUNhXrQdB04t89/1O/w1cDnyilFU='
     }
     data = {
@@ -157,7 +157,7 @@ elif user_role == "airportstaff":
 else: 
     menu_options = ["📝 ลงทะเบียนพนักงานใหม่"]
 
-# 💡 [แก้ไขใหม่] ล้างค่าเมนูเก่า และล็อคเมนูให้ตรงกับระดับสิทธิ์แบบปลอดภัย 100%
+# 💡 ล้างค่าเมนูเก่า และล็อคเมนูให้ตรงกับระดับสิทธิ์แบบปลอดภัย 100%
 if user_role == "guest":
     st.session_state["current_menu_choice"] = "📝 ลงทะเบียนพนักงานใหม่"
     menu_options = ["📝 ลงทะเบียนพนักงานใหม่"]
@@ -173,13 +173,19 @@ except ValueError:
 choice = st.sidebar.radio("เมนูใช้งาน", options=menu_options, index=menu_index)
 st.session_state["current_menu_choice"] = choice
 
+# 💡 [ดักจับความปลอดภัยเพิ่มเติม] หากผู้ใช้พยายามแอบจิ้มหรือสลับเมนูที่ตนไม่มีสิทธิ์ในระบบ
+if choice not in menu_options:
+    st.sidebar.error("❌ ขออภัย คุณไม่มีสิทธิ์เข้าใช้งานเมนูนี้")
+    st.session_state["current_menu_choice"] = menu_options[0]
+    st.rerun()
+
 # เช็คตัดหน้ากลับเฉพาะผู้ใช้งานที่เป็น Driver เท่านั้น เพื่อป้องกันเมนูค้างหน้าอื่น
 if user_role == "driver" and choice != "🚖 งานของฉัน (Driver)":
     st.session_state["current_menu_choice"] = "🚖 งานของฉัน (Driver)"
     st.rerun()
     
 # --- 4. แยกหน้าแสดงผลตามตัวเลือกเมนู ---
-if choice == "🏠 Dashboard":
+if choice == "🏠 Dashboard" and user_role in ["admin", "dispatcher"]:
     st.title("🏠 Dashboard")
     st.write("---")
     
@@ -279,8 +285,8 @@ if choice == "🏠 Dashboard":
                         st.warning("⚠️ รบกวนกรอก LINE ID และชื่อพนักงานให้ครบถ้วนครับ")
 
         with col_form_del:
+            st.write("❌ **โซนอันตราย: ลบพนักงานออกจากระบบ**")
             with st.form("user_delete_form"):
-                st.write("❌ **โซนอันตราย: ลบพนักงานออกจากระบบ**")
                 user_to_delete = st.selectbox("เลือกรายชื่อที่จะลบทิ้งเด็ดขาด", options=list(user_list_options.keys()))
                 confirm_delete = st.checkbox("⚠️ ยืนยันว่าต้องการลบข้อมูลพนักงานคนนี้จริง ๆ")
                 btn_delete = st.form_submit_button("🗑️ ลบพนักงานออกถาวร")
@@ -307,7 +313,7 @@ if choice == "🏠 Dashboard":
                     else: 
                         st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
 
-elif choice == "➕ Booker":
+elif choice == "➕ Booker" and user_role in ["admin", "booker"]:
     st.title("📋 แบบฟอร์มจองรถ (Booker)")
     st.subheader("กรอกรายละเอียดการเดินทางเพื่อส่งงานให้ผู้จัดสรรรถ")
 
@@ -373,7 +379,7 @@ elif choice == "➕ Booker":
     finally: 
         if db and db.open: db.close()
 
-elif choice == "🖥️ Dispatcher":
+elif choice == "🖥️ Dispatcher" and user_role in ["admin", "dispatcher"]:
     st.title("🎛️ แผงควบคุมสำหรับ Dispatcher")
     st.write("---")
     
@@ -443,7 +449,7 @@ elif choice == "🖥️ Dispatcher":
     finally: 
         if db and db.open: db.close()
 
-elif choice == "🚖 งานของฉัน (Driver)":
+elif choice == "🚖 งานของฉัน (Driver)" and user_role in ["admin", "driver"]:
     st.title("🚖 งานของฉัน (Driver)")
     
     driver_name = "คนขับรถ"
@@ -487,7 +493,6 @@ elif choice == "🚖 งานของฉัน (Driver)":
                     cursor.execute("UPDATE bookings SET status = 'Accepted' WHERE id = %s", (target_job_id,))
                     db.commit()
                     
-                    # 💡 แก้ไขเรียบร้อย: ลบวงเล็บปีกกาครอบตัวแปรปลายทางออก เพื่อส่งแจ้งเตือนแบบ String ได้ถูกต้อง
                     send_line_message(f"✅ คนขับ '{driver_name}' กดรับทราบงาน Voucher: {target_voucher} เรียบร้อยแล้วครับ!", current_id)
 
                     st.success("รับงานเรียบร้อย!")
@@ -500,7 +505,7 @@ elif choice == "🚖 งานของฉัน (Driver)":
     finally: 
         if db and db.open: db.close()
 
-# --- 3. ส่วนประวัติการวิ่งงาน ---
+    # --- 3. ส่วนประวัติการวิ่งงาน ---
     st.write("---")
     st.write("### ✅ ประวัติการวิ่งงาน (Completed)")
     db = None
@@ -516,7 +521,7 @@ elif choice == "🚖 งานของฉัน (Driver)":
     finally: 
         if db and db.open: db.close()
 
-elif choice == "✈️ Airport Staff":
+elif choice == "✈️ Airport Staff" and user_role in ["admin", "airportstaff"]:
     st.title("✈️ ตรวจสอบสถานะรถ (Airport Staff)")
     st.subheader("📋 ตารางมอนิเตอร์รถยนต์และคนขับที่กำลังปฏิบัติงาน")
 
@@ -581,18 +586,23 @@ elif choice == "📝 ลงทะเบียนพนักงานใหม�
                 try:
                     db_reg = get_connection()
                     with db_reg.cursor() as cursor:
-                        sql = """
-                            INSERT INTO users (line_user_id, name, role, status)
-                            VALUES (%s, %s, 'guest', 'Active')
-                            ON DUPLICATE KEY UPDATE name = %s, role = 'guest', status = 'Active'
-                        """
-                        cursor.execute(sql, (reg_line_id, reg_name, reg_name))
-                    db_reg.commit()
-                    st.success(f"🎉 ส่งข้อมูลรายงานตัวของพนักงานคุณ '{reg_name}' เรียบร้อย! รบกวนแจ้งแอดมินอนุมัติในหน้าหลังบ้านครับ")
+                        # 💡 [จุดดักข้อมูลซ้ำ] สั่งนับจำนวนว่าเคยมี LINE User ID นี้ในตารางแล้วหรือยัง
+                        cursor.execute("SELECT COUNT(*) FROM users WHERE line_user_id = %s", (reg_line_id,))
+                        if cursor.fetchone()[0] > 0:
+                            st.warning("⚠️ ขออภัยครับ! คุณเคยลงทะเบียนในระบบคิวรถ Hunsa เรียบร้อยแล้ว ไม่ต้องลงทะเบียนซ้ำครับ")
+                        else:
+                            sql = "INSERT INTO users (line_user_id, name, role, status) VALUES (%s, %s, 'guest', 'Active')"
+                            cursor.execute(sql, (reg_line_id, reg_name))
+                            db_reg.commit()
+                            st.success(f"🎉 ส่งข้อมูลรายงานตัวของพนักงานคุณ '{reg_name}' เรียบร้อย! รบกวนแจ้งแอดมินอนุมัติในหน้าหลังบ้านครับ")
                 except Exception as e:
                     st.error(f"❌ เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
                 finally:
                     if db_reg and db_reg.open: db_reg.close()
+else:
+    # 🔒 แสดงข้อความล็อกหน้าจอเมื่อผู้ใช้ไม่มีสิทธิ์ในกรณีหลุดสิทธิ์
+    st.warning("🔒 ขออภัยครับ คุณไม่มีสิทธิ์เข้าใช้งานระบบหรือหน้านี้ในปัจจุบัน")
+    st.info("💡 หากคุณเป็นพนักงานใหม่ กรุณาติดต่อแอดมินกล้าเพื่อตรวจสอบความถูกต้องของสิทธิ์การใช้งานครับ")
 
 # =================================================================
 # 🚪 ประตูลับ (API Endpoint) สำหรับรับข้อมูลจากหน้าเว็บ GitHub Pages
@@ -609,15 +619,15 @@ if "action" in q_params and q_params.get("action") == "api_register":
         try:
             db_api = get_connection()
             with db_api.cursor() as cursor:
-                sql_api = """
-                    INSERT INTO users (line_user_id, name, role, status)
-                    VALUES (%s, %s, 'guest', 'Active')
-                    ON DUPLICATE KEY UPDATE name = %s, role = 'guest', status = 'Active'
-                """
-                cursor.execute(sql_api, (api_line_id, api_name, api_name))
-            db_api.commit()
-            
-            st.write('{"status": "success", "message": "Register complete"}')
+                # 💡 [จุดดักข้อมูลซ้ำผ่านประตูลับ API] 
+                cursor.execute("SELECT COUNT(*) FROM users WHERE line_user_id = %s", (api_line_id,))
+                if cursor.fetchone()[0] > 0:
+                    st.write('{"status": "duplicate", "message": "คุณเคยลงทะเบียนในระบบเรียบร้อยแล้วครับ"}')
+                else:
+                    sql_api = "INSERT INTO users (line_user_id, name, role, status) VALUES (%s, %s, 'guest', 'Active')"
+                    cursor.execute(sql_api, (api_line_id, api_name))
+                    db_api.commit()
+                    st.write('{"status": "success", "message": "Register complete"}')
             st.stop()
             
         except Exception as e:
