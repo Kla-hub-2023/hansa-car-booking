@@ -11,14 +11,14 @@ def get_connection():
         return pymysql.connect(
             host='mysql-22653bef-kla-e55d.c.aivencloud.com',
             user='avnadmin',
-            password='AVNS_W4Huwc3abQww6NKNlG2', # เปลี่ยนเป็นรหัสผ่านล่าสุดที่ก๊อปปี้มาจากเว็บ Aiven
+            password='AVNS_W4Huwc3abQww6NKNlG2',
             database='defaultdb',
             port=23986,
-            connect_timeout=5 # ตั้งเวลา Timeout ไว้ 5 วินาทีไม่ให้หน้าเว็บค้าง
+            connect_timeout=5
         )
     except pymysql.MySQLError as e:
-        st.error(f"❌ ไม่สามารถเชื่อมต่อฐานข้อมูลได้: กรุณาตรวจสอบรหัสผ่านหรือสถานะของฐานข้อมูลบน Aiven (Error: {e})")
-        st.stop() # สั่งให้ Streamlit หยุดทำงานตรงนี้ ไม่ให้รันโค้ดส่วนอื่นต่อจนพัง
+        st.error(f"❌ ไม่สามารถเชื่อมต่อฐานข้อมูลได้: กรุณาตรวจสอบรหัสผ่านหรือสถานะบน Aiven (Error: {e})")
+        st.stop()
 
 # --- 2. ฟังก์ชันตรวจสอบสิทธิ์ ---
 def check_permission(user_id):
@@ -26,12 +26,8 @@ def check_permission(user_id):
         return "guest"
     uid = user_id.strip().lower()
     mapping = {
-        "admin01": "admin", 
-        "booker01": "booker", 
-        "dispatcher01": "dispatcher", 
-        "driver01": "driver", 
-        "staff01": "airportstaff", 
-        "airportstaff01": "airportstaff"
+        "admin01": "admin", "booker01": "booker", "dispatcher01": "dispatcher", 
+        "driver01": "driver", "staff01": "airportstaff", "airportstaff01": "airportstaff"
     }
     if uid in mapping: 
         return mapping[uid]
@@ -47,77 +43,43 @@ def check_permission(user_id):
             return "guest"
     except: 
         return "guest"
-    final_res = "guest"
-    if db and db.open:
-        db.close()
-    return "guest" if not 'res' in locals() or not res else str(res[0]).lower()
+    finally:
+        if db and db.open: db.close()
 
 st.set_page_config(page_title="ระบบจัดการรถ Hunsa", layout="wide")
+
 # =================================================================
-# 🎨 สไตล์ CSS ปรับขนาดตัวอักษรให้พอเหมาะกับหน้าจอมือถือ (เวอร์ชันซ่อมแซม)
+# 🎨 สไตล์ CSS ปรับขนาดตัวอักษรให้พอเหมาะกับหน้าจอมือถือ
 # =================================================================
 st.markdown("""
     <style>
-    /* ควบคุมขนาดตัวอักษรเมื่อเปิดบนหน้าจอมือถือ (ความกว้างไม่เกิน 768px) */
     @media (max-width: 768px) {
-        /* ปรับขนาดหัวข้อใหญ่ (h1) */
-        .stHtmlBlock h1, h1 {
-            font-size: 22px !important;
-            font-weight: 700 !important;
-            margin-bottom: 10px !important;
-        }
-        /* ปรับขนาดหัวข้อย่อย (h2, h3) */
-        .stHtmlBlock h2, h2, .stHtmlBlock h3, h3 {
-            font-size: 18px !important;
-            font-weight: 600 !important;
-        }
-        /* ปรับขนาดป้ายกำกับ Metric */
-        [data-testid="stMetricLabel"] {
-            font-size: 13px !important;
-        }
-        /* ปรับขนาดตัวเลข Metric */
-        [data-testid="stMetricValue"] {
-            font-size: 26px !important;
-            font-weight: 700 !important;
-        }
-        /* ปรับขนาดตัวหนังสือทั่วไปในฟอร์มและปุ่มกด */
-        .stButton button, .stSelectbox label, .stTextInput label, p {
-            font-size: 14px !important;
-        }
-        /* จัดการขนาดตัวอักษรในตาราง Dataframe */
-        .stDataFrame div, table th, table td {
-            font-size: 12px !important;
-        }
+        .stHtmlBlock h1, h1 { font-size: 22px !important; font-weight: 700 !important; margin-bottom: 10px !important; }
+        .stHtmlBlock h2, h2, .stHtmlBlock h3, h3 { font-size: 18px !important; font-weight: 600 !important; }
+        [data-testid="stMetricLabel"] { font-size: 13px !important; }
+        [data-testid="stMetricValue"] { font-size: 26px !important; font-weight: 700 !important; }
+        .stButton button, .stSelectbox label, .stTextInput label, p { font-size: 14px !important; }
+        .stDataFrame div, table th, table td { font-size: 12px !important; }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- ฟังก์ชันส่งข้อความแจ้งเตือนผ่าน LINE (Push Message) ---
+# --- ฟังก์ชันส่งข้อความแจ้งเตือนผ่าน LINE ---
 def send_line_message(message, target_line_id):
-    if not target_line_id or target_line_id.startswith("GUEST_"): 
-        return # ป้องกันแอร์เรอร์กรณีคนกดไม่มีรหัสไลน์จริง
-        
+    if not target_line_id or target_line_id.startswith("GUEST_"): return 
     url = 'https://api.line.me/v2/bot/message/push'
     headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer X8ogM3D2GxzZ3z5EBMdOxWTa4BjTlqP1H/bYv+fwqLGNiKhhxuiPQR5bakcgXfEZBUPNDImDlvLrDMvtqN0/8XTlrcqfIvti2m2RpY/wrbQ9xl95HJd+slpzHCM9Vs5SxNS5e9gBG4MSE71UUNhXrQdB04t89/1O/w1cDnyilFU='
     }
-    data = {
-        'to': target_line_id,  # รหัสตัว U ปลายทางที่ต้องการให้ไลน์เด้งเตือน
-        'messages': [{'type': 'text', 'text': message}]
-    }
-    try:
-        requests.post(url, headers=headers, json=data, timeout=5)
-    except Exception as e:
-        st.error(f"ระบบส่งแจ้งเตือน LINE ขัดข้อง: {e}")
+    data = {'to': target_line_id, 'messages': [{'type': 'text', 'text': message}]}
+    try: requests.post(url, headers=headers, json=data, timeout=5)
+    except: pass
         
 # --- 3. จัดการสถานะและเมนู ---
 q_params = st.query_params
-
-# ดักจับค่ารหัสตัว U ที่แนบมาจาก LINE LIFF
 line_id_from_url = q_params.get("user") or q_params.get("lineidtoemp")
 
-# เพิ่มเติม: ดักจับกรณีเปิดผ่านระบบปิดของ LINE แล้วค่าหลุดไปอยู่ใน liff.state
 if not line_id_from_url and "liff.state" in q_params:
     liff_state = q_params.get("liff.state")
     if isinstance(liff_state, list): liff_state = liff_state[0]
@@ -125,61 +87,42 @@ if not line_id_from_url and "liff.state" in q_params:
         line_id_from_url = liff_state.split("user=")[1].split("&")[0]
 
 if line_id_from_url:
-    if isinstance(line_id_from_url, list):
-        st.session_state.default_user_id = str(line_id_from_url[0]).strip()
-    else:
-        st.session_state.default_user_id = str(line_id_from_url).strip()
+    if isinstance(line_id_from_url, list): st.session_state.default_user_id = str(line_id_from_url[0]).strip()
+    else: st.session_state.default_user_id = str(line_id_from_url).strip()
 
 current_id = st.sidebar.text_input("ระบุ LINE User ID", value=st.session_state.get("default_user_id", "")).strip()
 st.session_state.default_user_id = current_id
 
-# ตรวจสอบสิทธิ์จากฟังก์ชันเดิม
 user_role = check_permission(current_id)
-
-# หากไม่มีการกรอก ID หรือเป็นสิทธิ์อื่นที่หาไม่เจอ ให้ปรับสถานะเป็น guest เสมอ
-if not current_id or user_role == "guest":
-    user_role = "guest"
+if not current_id or user_role == "guest": user_role = "guest"
 
 st.sidebar.info(f"สิทธิ์: {user_role.upper()}")
 
-# สร้างรายการเมนูตามระดับสิทธิ์แบบปลอดภัย
 menu_options = []
-if user_role == "admin": 
-    menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "🚖 งานของฉัน (Driver)", "✈️ Airport Staff", "📝 ลงทะเบียนพนักงานใหม่"]
-elif user_role == "booker": 
-    menu_options = ["➕ Booker"]
-elif user_role == "dispatcher": 
-    menu_options = ["🖥️ Dispatcher"]
-elif user_role == "driver": 
-    menu_options = ["🚖 งานของฉัน (Driver)"]
-elif user_role == "airportstaff": 
-    menu_options = ["✈️ Airport Staff"]
-else: 
-    menu_options = ["📝 ลงทะเบียนพนักงานใหม่"]
+if user_role == "admin": menu_options = ["🏠 Dashboard", "➕ Booker", "🖥️ Dispatcher", "🚖 งานของฉัน (Driver)", "✈️ Airport Staff", "📝 ลงทะเบียนพนักงานใหม่"]
+elif user_role == "booker": menu_options = ["➕ Booker"]
+elif user_role == "dispatcher": menu_options = ["🖥️ Dispatcher"]
+elif user_role == "driver": menu_options = ["🚖 งานของฉัน (Driver)"]
+elif user_role == "airportstaff": menu_options = ["✈️ Airport Staff"]
+else: menu_options = ["📝 ลงทะเบียนพนักงานใหม่"]
 
-# 💡 ล้างค่าเมนูเก่า และล็อคเมนูให้ตรงกับระดับสิทธิ์แบบปลอดภัย 100%
 if user_role == "guest":
     st.session_state["current_menu_choice"] = "📝 ลงทะเบียนพนักงานใหม่"
     menu_options = ["📝 ลงทะเบียนพนักงานใหม่"]
 elif "current_menu_choice" not in st.session_state or st.session_state["current_menu_choice"] not in menu_options: 
     st.session_state["current_menu_choice"] = menu_options[0]
 
-# ตรวจสอบค่า index แบบปลอดภัย ไม่ให้เกิด IndexError
-try:
-    menu_index = menu_options.index(st.session_state["current_menu_choice"])
-except ValueError:
-    menu_index = 0
+try: menu_index = menu_options.index(st.session_state["current_menu_choice"])
+except ValueError: menu_index = 0
 
 choice = st.sidebar.radio("เมนูใช้งาน", options=menu_options, index=menu_index)
 st.session_state["current_menu_choice"] = choice
 
-# 💡 [ดักจับความปลอดภัยเพิ่มเติม] หากผู้ใช้พยายามแอบจิ้มหรือสลับเมนูที่ตนไม่มีสิทธิ์ในระบบ
 if choice not in menu_options:
     st.sidebar.error("❌ ขออภัย คุณไม่มีสิทธิ์เข้าใช้งานเมนูนี้")
     st.session_state["current_menu_choice"] = menu_options[0]
     st.rerun()
 
-# เช็คตัดหน้ากลับเฉพาะผู้ใช้งานที่เป็น Driver เท่านั้น เพื่อป้องกันเมนูค้างหน้าอื่น
 if user_role == "driver" and choice != "🚖 งานของฉัน (Driver)":
     st.session_state["current_menu_choice"] = "🚖 งานของฉัน (Driver)"
     st.rerun()
@@ -189,7 +132,6 @@ if choice == "🏠 Dashboard" and user_role in ["admin", "dispatcher"]:
     st.title("🏠 Dashboard")
     st.write("---")
     
-    # 1. ส่วน Metric สรุปงาน
     db = None
     try:
         db = get_connection()
@@ -205,31 +147,25 @@ if choice == "🏠 Dashboard" and user_role in ["admin", "dispatcher"]:
         col_m1.metric("⏳ งานรอจัดสรร", count_pending)
         col_m2.metric("🚀 รถกำลังวิ่ง", count_active)
         col_m3.metric("🚖 คนขับทั้งหมด", count_drivers)
-    except Exception as e: 
-        st.error(f"Error Metric: {e}")
+    except Exception as e: st.error(f"Error Metric: {e}")
     finally: 
         if db and db.open: db.close()
 
-    # 2. ส่วนจัดการพนักงาน (เฉพาะ Admin เท่านั้น)
     if user_role == "admin":
         st.title("👥 ระบบจัดการสิทธิ์ผู้ใช้งาน (User Management)")
         st.write("---")
-    
         st.write("### ⏳ รายชื่อพนักงานใหม่ที่รออนุมัติสิทธิ์ (Guests)")
         db = None
         try:
             db = get_connection()
             with db.cursor() as cursor:
-                cursor.execute("SELECT line_user_id, name, role FROM users WHERE role = 'guest'")
+                cursor.execute("SELECT line_user_id, name, role, createdate FROM users WHERE role = 'guest'")
                 guests_data = cursor.fetchall()
             if guests_data:
-                df_guests = pd.DataFrame(guests_data, columns=['รหัส LINE User ID', 'ชื่อรายงานตัวพนักงาน', 'สถานะ'])
+                df_guests = pd.DataFrame(guests_data, columns=['รหัส LINE User ID', 'ชื่อรายงานตัวพนักงาน', 'สถานะ', 'วันที่สมัครเข้ามา'])
                 st.dataframe(df_guests, width='stretch', hide_index=True)
-                st.sidebar.info("💡 แอดมินสามารถก๊อปปี้รหัส LINE ID จากตารางด้านบนมาวางในกล่องแก้ไขเพื่ออัปเดตตำแหน่งได้ครับ")
-            else: 
-                st.success("✨ เรียบร้อยดี! ไม่มีพนักงานใหม่ค้างรออนุมัติสิทธิ์ในระบบครับ")
-        except Exception as e: 
-            st.error(f"เกิดข้อผิดพลาดในการดึงข้อมูล Guest: {e}")
+            else: st.success("✨ เรียบร้อยดี! ไม่มีพนักงานใหม่ค้างรออนุมัติสิทธิ์ในระบบครับ")
+        except Exception as e: st.error(f"เกิดข้อผิดพลาดในการดึงข้อมูล Guest: {e}")
         finally:
             if db and db.open: db.close()
 
@@ -241,13 +177,11 @@ if choice == "🏠 Dashboard" and user_role in ["admin", "dispatcher"]:
                 cursor.execute("SELECT line_user_id, name, role, status FROM users")
                 all_users = cursor.fetchall()
             user_list_options = {f"👤 {u[1]} ({u[2].upper()}) - [{u[3] if u[3] else 'Active'}]": u for u in all_users}
-        except Exception as e: 
-            st.error(f"ดึงข้อมูลผู้ใช้ล้มเหลว: {e}")
+        except Exception as e: st.error(f"ดึงข้อมูลผู้ใช้ล้มเหลว: {e}")
         finally:
             if db and db.open: db.close()
 
         col_form_edit, col_form_del = st.columns([2, 1])
-
         with col_form_edit:
             st.write("📝 **ระบบลงทะเบียน / แก้ไข และ ปรับสถานะพนักงาน**")
             select_user_action = st.selectbox("💡 เลือกพนักงานที่ต้องการแก้ไข (หรือเลือกเพิ่มคนใหม่)", options=["➕ ลงทะเบียนพนักงานใหม่ / กรอกเอง"] + list(user_list_options.keys()))
@@ -272,17 +206,21 @@ if choice == "🏠 Dashboard" and user_role in ["admin", "dispatcher"]:
                     if new_line_id and new_name:
                         try:
                             conn = get_connection()
+                            now_time = dt_module.datetime.now()
                             with conn.cursor() as cursor:
-                                sql = "INSERT INTO users (line_user_id, name, role, status) VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE name = %s, role = %s, status = %s"
-                                cursor.execute(sql, (new_line_id, new_name, new_role, new_status, new_name, new_role, new_status))
+                                # 💡 แก้ไขข้อ 3: เมื่อแอดมินแก้ไขหรือระบุสิทธิ์ ให้ทำการอัปเดตลงฟิลด์ updatedate ด้วย
+                                sql = """
+                                    INSERT INTO users (line_user_id, name, role, status, createdate, updatedate) 
+                                    VALUES (%s, %s, %s, %s, %s, %s) 
+                                    ON DUPLICATE KEY UPDATE name = %s, role = %s, status = %s, updatedate = %s
+                                """
+                                cursor.execute(sql, (new_line_id, new_name, new_role, new_status, now_time, now_time, new_name, new_role, new_status, now_time))
                             conn.commit()
                             conn.close()
-                            st.success(f"🎉 บันทึกข้อมูลและอัปเดตสถานะพนักงานเรียบร้อยแล้ว!")
+                            st.success(f"🎉 บันทึกข้อมูลและอัปเดตสถานะ (พร้อมแสตมป์เวลา updatedate) เรียบร้อยแล้ว!")
                             st.rerun()
-                        except Exception as e: 
-                            st.error(f"❌ เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
-                    else: 
-                        st.warning("⚠️ รบกวนกรอก LINE ID และชื่อพนักงานให้ครบถ้วนครับ")
+                        except Exception as e: st.error(f"❌ เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
+                    else: st.warning("⚠️ รบกวนกรอก LINE ID และชื่อพนักงานให้ครบถ้วนครับ")
 
         with col_form_del:
             st.write("❌ **โซนอันตราย: ลบพนักงานออกจากระบบ**")
@@ -299,45 +237,65 @@ if choice == "🏠 Dashboard" and user_role in ["admin", "dispatcher"]:
                             conn = get_connection()
                             with conn.cursor() as cursor:
                                 cursor.execute("SELECT COUNT(*) FROM bookings WHERE driver_id = %s", (target_del_id,))
-                                has_history = cursor.fetchone()[0]
-                                if has_history > 0:
-                                    st.error(f"❌ ไม่สามารถลบคุณ {target_del_name} ได้ เนื่องจากมีประวัติการวิ่งงานในระบบแล้ว (แนะนำให้เปลี่ยนสถานะเป็น Inactive แทน)")
+                                if cursor.fetchone()[0] > 0:
+                                    st.error(f"❌ ไม่สามารถลบคุณ {target_del_name} ได้ เนื่องจากมีประวัติงานวิ่งงานแล้ว")
                                 else:
                                     cursor.execute("DELETE FROM users WHERE line_user_id = %s", (target_del_id,))
                                     conn.commit()
-                                    st.success(f"🗑️ ลบข้อมูลพนักงานทดสอบคุณ {target_del_name} เรียบร้อยแล้ว!")
+                                    st.success(f"🗑️ ลบข้อมูลพนักงานเรียบร้อยแล้ว!")
                                     st.rerun()
                             conn.close()
-                        except Exception as e: 
-                            st.error(f"เกิดข้อผิดพลาด: {e}")
-                    else: 
-                        st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
+                        except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
+                    else: st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
 
 elif choice == "➕ Booker" and user_role in ["admin", "booker"]:
     st.title("📋 แบบฟอร์มจองรถ (Booker)")
     st.subheader("กรอกรายละเอียดการเดินทางเพื่อส่งงานให้ผู้จัดสรรรถ")
 
     with st.form(key="car_booking_form", clear_on_submit=True):
-        st.write("### 🚗 ข้อมูลการเดินทาง")
+        st.write("### 🚗 ข้อมูลพื้นฐานผู้โดยสาร")
         passenger_name = st.text_input("👤 ชื่อผู้โดยสาร / คณะเดินทาง", placeholder="เช่น คุณสมชาย ใจดี")
         pickup_location = st.text_input("📍 จุดรับ (Pickup)", placeholder="กรอกจุดรับ เช่น สนามบินสุวรรณภูมิ").strip()
         dropoff_location = st.text_input("🏁 จุดส่ง (Dropoff)", placeholder="กรอกจุดส่ง เช่น โรงแรมฮันซ่า").strip()
         
         st.write("📅 วันและเวลาเดินทาง")
-        col1, col2 = st.columns(2)
-        with col1:
-            booking_date = st.date_input("เลือกวันที่")
-        with col2:
-            booking_time_input = st.time_input("เลือกเวลา")
-        
+        col_d1, col_d2 = st.columns(2)
+        with col_d1: booking_date = st.date_input("เลือกวันที่")
+        with col_d2: booking_time_input = st.time_input("เลือกเวลา")
         combined_datetime = dt_module.datetime.combine(booking_date, booking_time_input)
+        
+        # 💡 แก้ไขข้อ 5: เพิ่มช่องกรอกข้อมูลตามรูปภาพแนบ E0B29DD8-5620-4DAC-A662-BAD005BAD52E.png
+        st.write("---")
+        st.write("### 📝 รายละเอียดเพิ่มเติมในใบงาน")
+        
+        col_b1, col_b2 = st.columns(2)
+        with col_b1:
+            in_group = st.text_input("🏨 Group (ชื่อโรงแรม)", placeholder="ระบุชื่อโรงแรมที่พัก")
+            in_flight = st.text_input("✈️ Flight (เที่ยวบิน เช่น TG921 ตัวพิมพ์ใหญ่)", placeholder="เช่น TG921")
+            in_time = st.time_input("🕒 Time (เวลาเที่ยวบิน)", value=dt_module.time(12, 0))
+            in_room = st.text_input("🔑 Room (ห้อง)", placeholder="ระบุเลขห้องพัก")
+        with col_b2:
+            in_type = st.text_input("🚘 Type (ประเภทรถ)", placeholder="เช่น SUV, Van, Sedan")
+            in_plate = st.text_input("🎫 Plate (ทะเบียนรถ)", placeholder="เช่น 9กข-1234 กทม.")
+            in_driver_text = st.text_input("👤 Driver's name (ชื่อพนักงานขับรถ)", placeholder="ระบุชื่อคนขับรถยนต์")
+            in_mobile = st.text_input("📱 Mobile No. (เบอร์โทร)", placeholder="เช่น 081-234-5678")
+            
+        col_b3, col_b4 = st.columns(2)
+        with col_b3:
+            in_1st_call = st.text_input("📞 1st call", placeholder="ระบุบันทึกสายที่ 1")
+        with col_b4:
+            in_2nd_call = st.text_input("📞 2nd call", placeholder="ระบุบันทึกสายที่ 2")
+            
+        in_vc_remark = st.text_area("🗒️ VC Remark", placeholder="กรอกหมายเหตุเกี่ยวกับ Voucher")
+        in_job_remark = st.text_area("🗒️ Job Remark", placeholder="กรอกหมายเหตุเกี่ยวกับงานจองนี้")
+        
         submit_button = st.form_submit_button("💾 บันทึกข้อมูลการจอง")
 
     if submit_button:
         if not passenger_name.strip() or not pickup_location or not dropoff_location:
-            st.error("⚠️ กรุณากรอกข้อมูลให้ครบถ้วนก่อนบันทึกครับ")
+            st.error("⚠️ กรุณากรอกข้อมูลหลัก (ชื่อผู้โดยสาร จุดรับ จุดส่ง) ให้ครบถ้วนก่อนบันทึกครับ")
         else:
-            with st.spinner("กำลังบันทึกข้อมูลลงระบบ..."):
+            with st.spinner("กำลังบันทึกข้อมูลและประทับเวลาลงระบบ..."):
                 db = None
                 try:
                     db = get_connection()
@@ -350,65 +308,64 @@ elif choice == "➕ Booker" and user_role in ["admin", "booker"]:
                         next_number = cursor.fetchone()[0] + 1
                         auto_voucher_no = f"VC{year_month_str}{str(next_number).zfill(5)}"
                         
-                        sql = "INSERT INTO bookings (voucher_no, passenger_name, pickup_location, dropoff_location, booking_time, status) VALUES (%s, %s, %s, %s, %s, %s)"
-                        cursor.execute(sql, (auto_voucher_no, passenger_name, pickup_location, dropoff_location, combined_datetime, 'Pending'))
+                        # 💡 บันทึกค่าใหม่ทั้งหมดรวมถึง createdate และ updatedate ลงไปในฐานข้อมูล
+                        sql = """
+                            INSERT INTO bookings (
+                                voucher_no, passenger_name, pickup_location, dropoff_location, booking_time, status,
+                                hotel_group, flight_no, flight_time, room_no, car_type, car_plate, driver_name_text,
+                                mobile_no, first_call, second_call, vc_remark, job_remark, createdate, updatedate
+                            ) VALUES (%s, %s, %s, %s, %s, 'Pending', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """
+                        cursor.execute(sql, (
+                            auto_voucher_no, passenger_name, pickup_location, dropoff_location, combined_datetime,
+                            in_group, in_flight, in_time, in_room, in_type, in_plate, in_driver_text,
+                            in_mobile, in_1st_call, in_2nd_call, in_vc_remark, in_job_remark, now, now
+                        ))
                     db.commit()
-                    st.success(f"🎉 บันทึกการจองสำเร็จ! เลขใบงาน: **{auto_voucher_no}**")
+                    st.success(f"🎉 บันทึกการจองสำเร็จ! เลขใบงาน: **{auto_voucher_no}** พร้อมบันทึกข้อมูลฟิลด์ใหม่ครบถ้วนครับ")
                     st.rerun()
-                except Exception as e: 
-                    st.error(f"❌ เกิดข้อผิดพลาด: {e}")
+                except Exception as e: st.error(f"❌ เกิดข้อผิดพลาด: {e}")
                 finally: 
                     if db and db.open: db.close()
 
     st.write("---")
-    st.write("### 🚗 รายการงานจองปัจจุบันที่คุณคีย์ในระบบ")
+    st.write("### 🚗 รายการงานจองปัจจุบันที่มีในระบบ")
     db = None
     try:
         db = get_connection()
         df_booker = pd.read_sql("""
-            SELECT voucher_no AS 'Voucher', passenger_name AS 'ชื่อผู้โดยสาร', pickup_location AS 'จุดรับ', 
-                   dropoff_location AS 'จุดส่ง', booking_time AS 'เวลาเดินทาง', status AS 'สถานะงาน' 
-            FROM bookings WHERE status IN ('Pending', 'Assigned') ORDER BY booking_time ASC
+            SELECT voucher_no AS 'Voucher', passenger_name AS 'ชื่อผู้โดยสาร', hotel_group AS 'Group/โรงแรม',
+                   flight_no AS 'Flight', car_plate AS 'ทะเบียนรถ', status AS 'สถานะงาน', createdate AS 'เวลาสร้างใบงาน'
+            FROM bookings WHERE status IN ('Pending', 'Assigned') ORDER BY id DESC
         """, db)
-        if not df_booker.empty: 
-            st.dataframe(df_booker, width='stretch', hide_index=True)
-        else: 
-            st.info("💡 ปัจจุบันยังไม่มีรายการงานค้างในระบบครับ")
-    except Exception as e: 
-        st.error(f"❌ ไม่สามารถดึงข้อมูลได้: {e}")
+        if not df_booker.empty: st.dataframe(df_booker, width='stretch', hide_index=True)
+        else: st.info("💡 ปัจจุบันยังไม่มีรายการงานค้างในระบบครับ")
+    except Exception as e: st.error(f"❌ ไม่สามารถดึงข้อมูลได้: {e}")
     finally: 
         if db and db.open: db.close()
 
 elif choice == "🖥️ Dispatcher" and user_role in ["admin", "dispatcher"]:
     st.title("🎛️ แผงควบคุมสำหรับ Dispatcher")
     st.write("---")
-    
     db = None
     try:
         db = get_connection()
-        # 1. ดึงข้อมูลคนขับ
         cursor = db.cursor()
         cursor.execute("SELECT line_user_id, name FROM users WHERE role = 'driver' AND status = 'Active'")
         drivers_data = cursor.fetchall()
         driver_options = {f"🚗 {d[1]} ({d[0][:6]}...)": d[0] for d in drivers_data}
         
-        # 2. ดึงข้อมูลงาน
         df_bookings = pd.read_sql("""
             SELECT id, voucher_no, passenger_name, pickup_location, dropoff_location, status, driver_id 
-            FROM bookings 
-            WHERE status IN ('Pending', 'Assigned')
-            ORDER BY id DESC
+            FROM bookings WHERE status IN ('Pending', 'Assigned') ORDER BY id DESC
         """, db)
         
         if not df_bookings.empty:
             df_bookings['คนขับที่รับงาน'] = df_bookings['driver_id'].map(lambda x: dict(drivers_data).get(x, "ยังไม่ได้จ่ายงาน") if x else "ยังไม่ได้จ่ายงาน")
-            
             st.write("### 📊 ตารางสถานะงาน")
             st.dataframe(df_bookings[['voucher_no', 'passenger_name', 'status', 'คนขับที่รับงาน']], width='stretch', hide_index=True)
             
-            # 3. ส่วนการจ่ายงานและปิดงาน
             col_assign, col_complete = st.columns(2)
-            
             with col_assign:
                 st.write("### 🚖 จ่ายงานใหม่")
                 job_map = {f"🎫 {row['voucher_no']} ({row['passenger_name']})": row['id'] for _, row in df_bookings.iterrows()}
@@ -416,15 +373,11 @@ elif choice == "🖥️ Dispatcher" and user_role in ["admin", "dispatcher"]:
                 sel_driver = st.selectbox("เลือกคนขับ", list(driver_options.keys()))
                 
                 if st.button("💾 บันทึกการมอบหมาย"):
-                    cursor.execute("UPDATE bookings SET driver_id = %s, status = 'Assigned' WHERE id = %s", 
-                                   (driver_options[sel_driver], job_map[sel_job]))
+                    now_time = dt_module.datetime.now()
+                    cursor.execute("UPDATE bookings SET driver_id = %s, status = 'Assigned', updatedate = %s WHERE id = %s", 
+                                   (driver_options[sel_driver], now_time, job_map[sel_job]))
                     db.commit()
-                    
-                    # 💡 สั่งให้ไลน์เด้งเตือนที่มือถือคนขับรถทันทีที่จ่ายงาน!
-                    driver_u_id = driver_options[sel_driver] 
-                    job_name = sel_job 
-                    send_line_message(f"🚖 มีงานใหม่มอบหมายถึงคุณ!\nเลขใบงาน: {job_name}\nกรุณาเข้าแอปเพื่อกดรับทราบงานด้วยครับ", driver_u_id)
-
+                    send_line_message(f"🚖 มีงานใหม่มอบหมายถึงคุณ!\nเลขใบงาน: {sel_job}\nกรุณาเข้าแอปเพื่อกดรับงานครับ", driver_options[sel_driver])
                     st.success("จ่ายงานเรียบร้อย!")
                     st.rerun()
 
@@ -435,207 +388,147 @@ elif choice == "🖥️ Dispatcher" and user_role in ["admin", "dispatcher"]:
                     job_opts = {f"✅ {row['voucher_no']}": row['id'] for _, row in active_jobs.iterrows()}
                     sel_done = st.selectbox("เลือกงานปิดสถานะ", list(job_opts.keys()))
                     if st.button("🏁 ยืนยันปิดงาน"):
-                        cursor.execute("UPDATE bookings SET status = 'Completed' WHERE id = %s", (job_opts[sel_done],))
+                        now_time = dt_module.datetime.now()
+                        cursor.execute("UPDATE bookings SET status = 'Completed', updatedate = %s WHERE id = %s", (now_time, job_opts[sel_done]))
                         db.commit()
                         st.success("ปิดงานสำเร็จ!")
                         st.rerun()
-                else:
-                    st.info("ไม่มีงานที่กำลังวิ่งอยู่ให้กดปิด")
-        else:
-            st.info("✨ ไม่มีงานค้างในระบบ")
-            
-    except Exception as e: 
-        st.error(f"Error: {e}")
+                else: st.info("ไม่มีงานที่กำลังวิ่งอยู่ให้กดปิด")
+        else: st.info("✨ ไม่มีงานค้างในระบบ")
+    except Exception as e: st.error(f"Error: {e}")
     finally: 
         if db and db.open: db.close()
 
 elif choice == "🚖 งานของฉัน (Driver)" and user_role in ["admin", "driver"]:
     st.title("🚖 งานของฉัน (Driver)")
-    
     driver_name = "คนขับรถ"
     db = None
     try:
         db = get_connection()
         cursor = db.cursor() 
-        
-        # 1. ดึงชื่อคนขับ
         cursor.execute("SELECT name FROM users WHERE line_user_id = %s", (current_id,))
         res = cursor.fetchone()
         if res: driver_name = res[0]
         st.subheader(f"👋 สวัสดีคุณ: {driver_name}")
         st.write("---")
         
-        # 2. ดึงงานปัจจุบัน
         df_driver = pd.read_sql("""
-            SELECT id, voucher_no, passenger_name, pickup_location, dropoff_location, status 
-            FROM bookings 
-            WHERE driver_id = %s AND status IN ('Assigned', 'Accepted')
-            ORDER BY booking_time ASC
+            SELECT id, voucher_no, passenger_name, pickup_location, dropoff_location, status,
+                   hotel_group, flight_no, room_no, car_plate, mobile_no, vc_remark, job_remark
+            FROM bookings WHERE driver_id = %s AND status IN ('Assigned', 'Accepted') ORDER BY booking_time ASC
         """, db, params=(current_id,))
         
         if not df_driver.empty:
             st.write("### 📥 รายการงานที่ได้รับมอบหมาย")
-            st.dataframe(df_driver, width='stretch', hide_index=True)
+            st.dataframe(df_driver[['voucher_no', 'passenger_name', 'pickup_location', 'dropoff_location', 'hotel_group', 'flight_no', 'car_plate', 'status']], width='stretch', hide_index=True)
             
+            # เปิดให้คนขับดูข้อมูลสายโทรศัพท์และข้อมูลใบงานจาก Booker ได้ละเอียดผ่านหน้าต่างแอป
+            st.write("🔍 **รายละเอียดงานจองของคุณโดยละเอียด:**")
+            for _, r in df_driver.iterrows():
+                with st.expander(f"📋 ใบงาน {r['voucher_no']} - คุณ {r['passenger_name']}"):
+                    st.write(f"🏨 **โรงแรม (Group):** {r['hotel_group']} | **ห้องพัก:** {r['room_no']}")
+                    st.write(f"✈️ **เที่ยวบิน:** {r['flight_no']} | **ทะเบียนรถ:** {r['car_plate']}")
+                    st.write(f"📱 **เบอร์โทรติดต่อ:** {r['mobile_no']}")
+                    st.write(f"💬 **หมายเหตุ Voucher:** {r['vc_remark']}")
+                    st.write(f"💬 **หมายเหตุงาน:** {r['job_remark']}")
+
             assigned_jobs = df_driver[df_driver['status'] == 'Assigned']
             if not assigned_jobs.empty:
                 st.write("---")
                 st.write("### 📥 งานใหม่รอรับทราบ")
-                
-                # เก็บเฉพาะเลข Voucher ไปใช้งานเพื่อให้โค้ดอ่านง่ายและไม่เอ๋อ
                 job_map = {f"🎫 {row['voucher_no']} | ลูกค้า {row['passenger_name']}": (row['id'], row['voucher_no']) for _, row in assigned_jobs.iterrows()}
                 selected_job = st.selectbox("เลือกงานที่ต้องการรับ", list(job_map.keys()))
                 
                 if st.button("✅ กดรับทราบและยอมรับงาน"):
                     target_job_id = job_map[selected_job][0]
                     target_voucher = job_map[selected_job][1]
+                    now_time = dt_module.datetime.now()
                     
-                    cursor.execute("UPDATE bookings SET status = 'Accepted' WHERE id = %s", (target_job_id,))
+                    cursor.execute("UPDATE bookings SET status = 'Accepted', updatedate = %s WHERE id = %s", (now_time, target_job_id))
                     db.commit()
-                    
                     send_line_message(f"✅ คนขับ '{driver_name}' กดรับทราบงาน Voucher: {target_voucher} เรียบร้อยแล้วครับ!", current_id)
-
                     st.success("รับงานเรียบร้อย!")
                     st.rerun()
-        else:
-            st.info("✨ ปัจจุบันคุณยังไม่มีงานค้างที่ต้องปฏิบัติครับ")
-            
-    except Exception as e: 
-        st.error(f"Error Driver Page: {e}")
-    finally: 
-        if db and db.open: db.close()
-
-    # --- 3. ส่วนประวัติการวิ่งงาน ---
-    st.write("---")
-    st.write("### ✅ ประวัติการวิ่งงาน (Completed)")
-    db = None
-    try:
-        db = get_connection()
-        df_history = pd.read_sql("SELECT voucher_no, passenger_name, status FROM bookings WHERE driver_id = %s AND status = 'Completed' ORDER BY id DESC LIMIT 20", db, params=(current_id,))
-        if not df_history.empty:
-            st.dataframe(df_history, width='stretch', hide_index=True)
-        else:
-            st.info("ยังไม่มีประวัติการวิ่งงานครับ")
-    except Exception as e: 
-        st.error(f"Error History: {e}")
+        else: st.info("✨ ปัจจุบันคุณยังไม่มีงานค้างที่ต้องปฏิบัติครับ")
+    except Exception as e: st.error(f"Error Driver Page: {e}")
     finally: 
         if db and db.open: db.close()
 
 elif choice == "✈️ Airport Staff" and user_role in ["admin", "airportstaff"]:
     st.title("✈️ ตรวจสอบสถานะรถ (Airport Staff)")
-    st.subheader("📋 ตารางมอนิเตอร์รถยนต์และคนขับที่กำลังปฏิบัติงาน")
-
     db = None
     try:
         db = get_connection()
         query = """
-            SELECT b.voucher_no AS 'เลข Voucher', b.passenger_name AS 'ชื่อผู้โดยสาร', 
-                   b.pickup_location AS 'จุดรับ', b.dropoff_location AS 'จุดส่ง', 
-                   b.booking_time AS 'เวลาเดินทาง', b.status AS 'สถานะงาน', 
-                   u.name AS 'คนขับรถที่รับงาน'
-            FROM bookings b 
-            LEFT JOIN users u ON b.driver_id = u.line_user_id
-            WHERE b.status IN ('Assigned', 'Accepted') 
-            ORDER BY b.booking_time ASC
+            SELECT b.voucher_no AS 'เลข Voucher', b.passenger_name AS 'ชื่อผู้โดยสาร', b.hotel_group AS 'โรงแรม',
+                   b.pickup_location AS 'จุดรับ', b.dropoff_location AS 'จุดส่ง', b.status AS 'สถานะงาน', u.name AS 'คนขับรถที่รับงาน'
+            FROM bookings b LEFT JOIN users u ON b.driver_id = u.line_user_id
+            WHERE b.status IN ('Assigned', 'Accepted') ORDER BY b.booking_time ASC
         """
         df_airport = pd.read_sql(query, db)
-        
         if not df_airport.empty:
-            st.write("✨ แสดงงานที่กำลังดำเนินการภาคพื้นสนามบิน")
-            
             def highlight_status(row):
-                color = '#fff3cd' if row['สถานะงาน'] == 'Assigned' else '#d4edda'
-                return [f'background-color: {color}'] * len(row)
-            
+                return ['background-color: #fff3cd' if row['สถานะงาน'] == 'Assigned' else 'background-color: #d4edda'] * len(row)
             st.dataframe(df_airport.style.apply(highlight_status, axis=1), width='stretch', hide_index=True)
-            
-            st.write("---")
-            col1, col2 = st.columns(2)
-            with col1: 
-                st.metric(label="🚖 กำลังเดินทาง (Assigned)", value=len(df_airport[df_airport['สถานะงาน'] == 'Assigned']))
-            with col2: 
-                st.metric(label="✅ คนขับรับทราบงานแล้ว (Accepted)", value=len(df_airport[df_airport['สถานะงาน'] == 'Accepted']))
-        else:
-            st.info("ℹ️ ปัจจุบันยังไม่มีรถยนต์ที่อยู่ในสถานะรับงานครับ")
-            
-    except Exception as e: 
-        st.error(f"❌ เกิดข้อผิดพลาดในการดึงข้อมูล: {e}")
+        else: st.info("ℹ️ ปัจจุบันยังไม่มีรถยนต์ที่อยู่ในสถานะรับงานครับ")
+    except Exception as e: st.error(f"❌ เกิดข้อผิดพลาด: {e}")
     finally: 
         if db and db.open: db.close()
 
 elif choice == "📝 ลงทะเบียนพนักงานใหม่":
     st.title("📝 ลงทะเบียนพนักงานใหม่")
     st.write("---")
-    
     st.markdown("### 👤 กรอกข้อมูลรายงานตัวเพื่อส่งให้แอดมินอนุมัติ")
-    st.info("💡 กรุณากดปุ่มดึงรหัสในแอป LINE (Rich Menu หรือข้อความปักหมุด) แล้วนำรหัสตัว U 33 หลักมาวางด้านล่างนี้ครับ")
     
     with st.form("guest_register_form", clear_on_submit=True):
-        reg_name = st.text_input("1. กรุณากรอก ชื่อ - นามสกุลจริงของคุณ", placeholder="เช่น นายสมชาย ใจดีมาก").strip()
-        reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ (รหัสตัว U 33 หลัก)", value=current_id if current_id else "", placeholder="วางรหัสตัว U ที่คัดลอกมาที่นี่ครับ")
-        
+        reg_name = st.text_input("1. กรุณากรอก ชื่อ - นามสกุลจริงของคุณ").strip()
+        reg_line_id = st.text_input("2. ระบุรหัส LINE User ID ของคุณ", value=current_id if current_id else "")
         submit_reg = st.form_submit_button("🚀 ส่งข้อมูลลงทะเบียนระบบคิวรถ")
         
         if submit_reg:
-            if not reg_name or not reg_line_id:
-                st.error("⚠️ กรุณากรอกชื่อและรหัส LINE ID ให้ครบถ้วนก่อนกดส่งข้อมูลครับ")
-            elif "http" in reg_line_id.lower() or "line.me" in reg_line_id.lower() or len(reg_line_id) < 10 or "*" in reg_line_id:
-                st.error("⚠️ รหัส LINE User ID ไม่ถูกต้อง! กรุณานำเฉพาะรหัสตัว U มาวางให้ถูกต้องครับ")
+            if not reg_name or not reg_line_id: st.error("⚠️ กรุณากรอกชื่อและรหัส LINE ID ให้ครบถ้วนก่อนกดส่งข้อมูลครับ")
             else:
                 db_reg = None
                 try:
                     db_reg = get_connection()
+                    now_time = dt_module.datetime.now()
                     with db_reg.cursor() as cursor:
-                        # 💡 [จุดดักข้อมูลซ้ำ] สั่งนับจำนวนว่าเคยมี LINE User ID นี้ในตารางแล้วหรือยัง
                         cursor.execute("SELECT COUNT(*) FROM users WHERE line_user_id = %s", (reg_line_id,))
                         if cursor.fetchone()[0] > 0:
-                            st.warning("⚠️ ขออภัยครับ! คุณเคยลงทะเบียนในระบบคิวรถ Hunsa เรียบร้อยแล้ว ไม่ต้องลงทะเบียนซ้ำครับ")
+                            st.warning("⚠️ ขออภัยครับ! คุณเคยลงทะเบียนในระบบเรียบร้อยแล้ว ไม่ต้องลงทะเบียนซ้ำครับ")
                         else:
-                            sql = "INSERT INTO users (line_user_id, name, role, status) VALUES (%s, %s, 'guest', 'Active')"
-                            cursor.execute(sql, (reg_line_id, reg_name))
+                            # 💡 แก้ไขข้อ 2: เมื่อกดส่งสิทธิ์พนักงานใหม่ทางหน้าเว็บตรง ๆ ให้บันทึกระบุ createdate, updatedate ไปด้วย
+                            sql = "INSERT INTO users (line_user_id, name, role, status, createdate, updatedate) VALUES (%s, %s, 'guest', 'Active', %s, %s)"
+                            cursor.execute(sql, (reg_line_id, reg_name, now_time, now_time))
                             db_reg.commit()
-                            st.success(f"🎉 ส่งข้อมูลรายงานตัวของพนักงานคุณ '{reg_name}' เรียบร้อย! รบกวนแจ้งแอดมินอนุมัติในหน้าหลังบ้านครับ")
-                except Exception as e:
-                    st.error(f"❌ เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
+                            st.success(f"🎉 ส่งข้อมูลรายงานตัวของคุณ '{reg_name}' (พร้อมระบุประทับเวลาสมัคร) เรียบร้อย!")
+                except Exception as e: st.error(f"❌ เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
                 finally:
                     if db_reg and db_reg.open: db_reg.close()
-else:
-    # 🔒 แสดงข้อความล็อกหน้าจอเมื่อผู้ใช้ไม่มีสิทธิ์ในกรณีหลุดสิทธิ์
-    st.warning("🔒 ขออภัยครับ คุณไม่มีสิทธิ์เข้าใช้งานระบบหรือหน้านี้ในปัจจุบัน")
-    st.info("💡 หากคุณเป็นพนักงานใหม่ กรุณาติดต่อแอดมินกล้าเพื่อตรวจสอบความถูกต้องของสิทธิ์การใช้งานครับ")
 
-# =================================================================
-# 🚪 ประตูลับ (API Endpoint) สำหรับรับข้อมูลจากหน้าเว็บ GitHub Pages
-# =================================================================
+# --- 🚪 ประตูลับ (API Endpoint สำหรับรับข้อมูลจากเว็บ GitHub Pages) ---
 if "action" in q_params and q_params.get("action") == "api_register":
-    api_name = q_params.get("name")
-    api_line_id = q_params.get("line_id")
-    
-    if isinstance(api_name, list): api_name = api_name[0]
-    if isinstance(api_line_id, list): api_line_id = api_line_id[0]
+    api_name = q_params.get("name")[0] if isinstance(q_params.get("name"), list) else q_params.get("name")
+    api_line_id = q_params.get("line_id")[0] if isinstance(q_params.get("line_id"), list) else q_params.get("line_id")
     
     if api_name and api_line_id:
         db_api = None
         try:
             db_api = get_connection()
+            now_time = dt_module.datetime.now()
             with db_api.cursor() as cursor:
-                # 💡 [จุดดักข้อมูลซ้ำผ่านประตูลับ API] 
                 cursor.execute("SELECT COUNT(*) FROM users WHERE line_user_id = %s", (api_line_id,))
                 if cursor.fetchone()[0] > 0:
                     st.write('{"status": "duplicate", "message": "คุณเคยลงทะเบียนในระบบเรียบร้อยแล้วครับ"}')
                 else:
-                    sql_api = "INSERT INTO users (line_user_id, name, role, status) VALUES (%s, %s, 'guest', 'Active')"
-                    cursor.execute(sql_api, (api_line_id, api_name))
+                    # 💡 แก้ไขข้อ 2: ระบุประทับเวลาผ่านท่อประตูลับ API ลงตัวแปรคู่ทั้งสองตัวให้เรียบร้อยครับ
+                    sql_api = "INSERT INTO users (line_user_id, name, role, status, createdate, updatedate) VALUES (%s, %s, 'guest', 'Active', %s, %s)"
+                    cursor.execute(sql_api, (api_line_id, api_name, now_time, now_time))
                     db_api.commit()
                     st.write('{"status": "success", "message": "Register complete"}')
             st.stop()
-            
         except Exception as e:
             st.write(f'{{"status": "error", "message": "{str(e)}"}}')
             st.stop()
         finally:
-            if db_api and db_api.open: 
-                db_api.close()
-    else:
-        st.write('{"status": "error", "message": "Missing arguments"}')
-        st.stop()
+            if db_api and db_api.open: db_api.close()
