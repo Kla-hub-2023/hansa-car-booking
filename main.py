@@ -456,22 +456,54 @@ elif choice == "🚖 งานของฉัน (Driver)" and user_role in ["ad
 
 elif choice == "✈️ Airport Staff" and user_role in ["admin", "airportstaff"]:
     st.title("✈️ ตรวจสอบสถานะรถ (Airport Staff)")
+    st.subheader("📋 ตารางมอนิเตอร์รถยนต์และคนขับที่กำลังปฏิบัติงาน")
+
     db = None
     try:
         db = get_connection()
+        # 💡 ปรับปรุงคิวรี: ดึงฟิลด์ใหม่ทั้งหมดออกมาร่วมแสดงผลบนหน้าจอ Airport Staff
         query = """
-            SELECT b.voucher_no AS 'เลข Voucher', b.passenger_name AS 'ชื่อผู้โดยสาร', b.hotel_group AS 'โรงแรม',
-                   b.pickup_location AS 'จุดรับ', b.dropoff_location AS 'จุดส่ง', b.status AS 'สถานะงาน', u.name AS 'คนขับรถที่รับงาน'
-            FROM bookings b LEFT JOIN users u ON b.driver_id = u.line_user_id
-            WHERE b.status IN ('Assigned', 'Accepted') ORDER BY b.booking_time ASC
+            SELECT b.voucher_no AS 'เลข Voucher', 
+                   b.passenger_name AS 'ชื่อผู้โดยสาร', 
+                   b.hotel_group AS 'Group (โรงแรม)',
+                   b.flight_no AS 'Flight',
+                   b.flight_time AS 'เวลาบิน',
+                   b.room_no AS 'ห้อง',
+                   b.car_type AS 'ประเภทรถ',
+                   b.car_plate AS 'ทะเบียนรถ',
+                   b.mobile_no AS 'เบอร์โทร',
+                   b.status AS 'สถานะงาน', 
+                   u.name AS 'คนขับระบบ (LINE)',
+                   b.driver_name_text AS 'ชื่อคนขับ (ระบุ)'
+            FROM bookings b 
+            LEFT JOIN users u ON b.driver_id = u.line_user_id
+            WHERE b.status IN ('Assigned', 'Accepted') 
+            ORDER BY b.booking_time ASC
         """
         df_airport = pd.read_sql(query, db)
+        
         if not df_airport.empty:
+            st.write("✨ แสดงงานคิวรถที่กำลังดำเนินการภาคพื้นสนามบินในขณะนี้")
+            
+            # ฟังก์ชันทำไฮไลท์สีแยกสถานะงานเพื่อความสบายตา (Assigned = เหลือง, Accepted = เขียว)
             def highlight_status(row):
-                return ['background-color: #fff3cd' if row['สถานะงาน'] == 'Assigned' else 'background-color: #d4edda'] * len(row)
+                color = '#fff3cd' if row['สถานะงาน'] == 'Assigned' else '#d4edda'
+                return [f'background-color: {color}'] * len(row)
+            
+            # 💡 แสดงผลตารางตัวเต็มกางออกหน้าจอแบบ stretch พร้อมซ่อน index
             st.dataframe(df_airport.style.apply(highlight_status, axis=1), width='stretch', hide_index=True)
-        else: st.info("ℹ️ ปัจจุบันยังไม่มีรถยนต์ที่อยู่ในสถานะรับงานครับ")
-    except Exception as e: st.error(f"❌ เกิดข้อผิดพลาด: {e}")
+            
+            st.write("---")
+            col1, col2 = st.columns(2)
+            with col1: 
+                st.metric(label="🚖 กำลังเดินทาง (Assigned)", value=len(df_airport[df_airport['สถานะงาน'] == 'Assigned']))
+            with col2: 
+                st.metric(label="✅ คนขับรับทราบงานแล้ว (Accepted)", value=len(df_airport[df_airport['สถานะงาน'] == 'Accepted']))
+        else:
+            st.info("ℹ️ ปัจจุบันยังไม่มีรถยนต์หรือใบงานใดอยู่ในสถานะกำลังปฏิบัติงานครับ")
+            
+    except Exception as e: 
+        st.error(f"❌ เกิดข้อผิดพลาดในการดึงข้อมูลหน้า Airport Staff: {e}")
     finally: 
         if db and db.open: db.close()
 
