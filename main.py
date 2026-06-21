@@ -286,13 +286,14 @@ elif choice == "➕ Booker" and user_role in ["admin", "booker"]:
     init_pickup = ""
     init_dropoff = ""
     init_date = dt_module.date.today()
-    init_time_str = "12:00"
+    init_time_obj = dt_module.time(12, 0) # กลับมาใช้ Object เวลา
     
     init_group = ""
     init_flight = ""
-    init_f_time_str = "12:00"
+    init_f_time_obj = dt_module.time(12, 0) # กลับมาใช้ Object เวลา
     init_room = ""
-    init_type = ""
+    init_type = "Camry" # ค่าเริ่มต้นประเภทรถ
+    init_custom_type = ""
     init_1st_call = ""
     init_2nd_call = ""
     init_vc_remark = ""
@@ -311,7 +312,7 @@ elif choice == "➕ Booker" and user_role in ["admin", "booker"]:
         
         if isinstance(b_data[5], dt_module.datetime):
             init_date = b_data[5].date()
-            init_time_str = b_data[5].strftime("%H:%M")
+            init_time_obj = b_data[5].time()
             
         init_group = b_data[6] if b_data[6] else ""
         init_flight = b_data[7] if b_data[7] else ""
@@ -319,14 +320,21 @@ elif choice == "➕ Booker" and user_role in ["admin", "booker"]:
         if b_data[8]:
             if isinstance(b_data[8], dt_module.timedelta):
                 total_secs = int(b_data[8].total_seconds())
-                init_f_time_str = f"{str(total_secs // 3600).zfill(2)}:{str((total_secs % 3600) // 60).zfill(2)}"
+                init_f_time_obj = dt_module.time(total_secs // 3600, (total_secs % 3600) // 60)
             elif isinstance(b_data[8], dt_module.time):
-                init_f_time_str = b_data[8].strftime("%H:%M")
-            else:
-                init_f_time_str = str(b_data[8])[:5]
+                init_f_time_obj = b_data[8]
                 
         init_room = b_data[9] if b_data[9] else ""
-        init_type = b_data[10] if b_data[10] else ""
+        
+        # ดึงประเภทรถเดิมมาเช็คสิทธิ์จับคู่กับตัวเลือก Auto
+        db_car_type = b_data[10] if b_data[10] else ""
+        car_pool_check = ["Camry", "Commuter", "E-Class", "S-Class", "V-Class", "Alphard", "BMW"]
+        if db_car_type in car_pool_check:
+            init_type = db_car_type
+        elif db_car_type != "":
+            init_type = "Other / กรอกประเภทรถอื่น"
+            init_custom_type = db_car_type
+            
         init_1st_call = b_data[14] if b_data[14] else ""
         init_2nd_call = b_data[15] if b_data[15] else ""
         init_vc_remark = b_data[16] if b_data[16] else ""
@@ -345,8 +353,12 @@ elif choice == "➕ Booker" and user_role in ["admin", "booker"]:
         
         st.write("📅 วันและเวลาเดินทาง")
         col_d1, col_d2 = st.columns(2)
-        with col_d1: booking_date = st.date_input("เลือกวันที่", value=init_date)
-        with col_d2: booking_time_str = st.text_input("🕒 เวลาเดินทาง (ชั่วโมง:นาที)", value=init_time_str, placeholder="เช่น 14:30").strip()
+        with col_d1: 
+            booking_date = st.date_input("เลือกวันที่", value=init_date)
+        with col_d2: 
+            # 💡 ข้อ 2: ปรับกลับมาใช้ st.time_input ที่มีความละเอียดระดับ 1 นาที (คีย์และคลิกเลือกได้คมชัด)
+            booking_time_obj = st.time_input("🕒 เวลาเดินทาง (คลิกเลือกหรือคีย์ระดับนาทีได้)", value=init_time_obj, step=60)
+        combined_datetime = dt_module.datetime.combine(booking_date, booking_time_obj)
         
         st.write("---")
         st.write("### 📝 รายละเอียดเพิ่มเติมในใบงาน")
@@ -356,12 +368,17 @@ elif choice == "➕ Booker" and user_role in ["admin", "booker"]:
             in_group = st.text_input("🏨 Group (ชื่อโรงแรม)", value=init_group, placeholder="ระบุชื่อโรงแรมที่พัก")
             in_flight = st.text_input("✈️ Flight (เที่ยวบิน)", value=init_flight, placeholder="เช่น TG921")
         with col_b2:
-            in_flight_time_str = st.text_input("🕒 Time (เวลาเที่ยวบิน)", value=init_f_time_str, placeholder="เช่น 12:30").strip()
+            in_flight_time_obj = st.time_input("🕒 Time (เวลาเที่ยวบิน)", value=init_f_time_obj, step=60)
             in_room = st.text_input("🔑 Room (ห้อง)", value=init_room, placeholder="ระบุเลขห้องพัก")
             
-        in_type = st.text_input("🚘 Type (ประเภทรถ)", value=init_type, placeholder="เช่น SUV, Van, Sedan")
+        # 💡 ข้อ 4: ทำ Auto ประเภทรถให้เลือกใช้งานแบบสะดวก
+        car_options = ["Camry", "Commuter", "E-Class", "S-Class", "V-Class", "Alphard", "BMW", "Other / กรอกประเภทรถอื่น"]
+        selected_car_type = st.selectbox("🚘 Type (ประเภทรถ)", options=car_options, index=car_options.index(init_type))
         
-        # 💡 ข้อ 2: หน้า booker ไม่แสดงช่อง plate, drivername, mobile number (ซ่อนออกหมดแล้วครับ)
+        # ถ้าเลือกประเภทรถอื่น ให้กางกล่องข้อความมาพิมพ์ข้อความเองอิสระ
+        custom_car_type = ""
+        if selected_car_type == "Other / กรอกประเภทรถอื่น":
+            custom_car_type = st.text_input("✍️ โปรดระบุประเภทรถอื่นๆ ที่ต้องการ", value=init_custom_type, placeholder="เช่น Limousine, Bus").strip()
             
         col_b3, col_b4 = st.columns(2)
         with col_b3: in_1st_call = st.text_input("📞 1st call", value=init_1st_call, placeholder="ระบุบันทึกสายที่ 1")
@@ -377,83 +394,72 @@ elif choice == "➕ Booker" and user_role in ["admin", "booker"]:
         if not passenger_name.strip() or not pickup_location or not dropoff_location:
             st.error("⚠️ กรุณากรอกข้อมูลหลักให้ครบถ้วนก่อนบันทึกครับ")
         else:
-            valid_time = True
-            try:
-                parsed_b_time = dt_module.datetime.strptime(booking_time_str, "%H:%M").time()
-                combined_datetime = dt_module.datetime.combine(booking_date, parsed_b_time)
-            except ValueError:
-                st.error("❌ รูปแบบ 'เวลาเดินทาง' ไม่ถูกต้อง! กรุณาพิมพ์ในรูปแบบ เช่น 14:30")
-                valid_time = False
-                
-            try:
-                parsed_f_time = dt_module.datetime.strptime(in_flight_time_str, "%H:%M").time()
-            except ValueError:
-                st.error("❌ รูปแบบ 'เวลาเที่ยวบิน' ไม่ถูกต้อง! กรุณาพิมพ์ในรูปแบบ เช่น 12:30")
-                valid_time = False
-
-            if valid_time:
-                with st.spinner("กำลังประมวลผลข้อมูล..."):
-                    db = None
-                    try:
-                        db = get_connection()
-                        now = dt_module.datetime.now()
-                        
-                        with db.cursor() as cursor:
-                            if is_edit_mode:
-                                # หน้า Booker อัปเดตเฉพาะฟิลด์ที่ได้รับสิทธิ์กรอก
-                                sql_update = """
-                                    UPDATE bookings SET
-                                        passenger_name = %s, pickup_location = %s, dropoff_location = %s, booking_time = %s,
-                                        hotel_group = %s, flight_no = %s, flight_time = %s, room_no = %s, car_type = %s, 
-                                        first_call = %s, second_call = %s, vc_remark = %s, job_remark = %s, updatedate = %s
-                                    WHERE id = %s
-                                """
-                                cursor.execute(sql_update, (
-                                    passenger_name, pickup_location, dropoff_location, combined_datetime,
-                                    in_group, in_flight, parsed_f_time, in_room, in_type,
-                                    in_1st_call, in_2nd_call, in_vc_remark, in_job_remark, now, target_booking_id
-                                ))
-                                db.commit()
-                                st.success(f"⚙️ อัปเดตข้อมูลใบงานเลขที่ **{init_voucher_no}** เรียบร้อยแล้ว!")
-                            else:
-                                year_month_str = now.strftime("%Y%m")
-                                cursor.execute("SELECT COUNT(*) FROM bookings WHERE voucher_no LIKE %s", (f"VC{year_month_str}%",))
-                                next_number = cursor.fetchone()[0] + 1
-                                auto_voucher_no = f"VC{year_month_str}{str(next_number).zfill(5)}"
-                                
-                                sql_insert = """
-                                    INSERT INTO bookings (
-                                        voucher_no, passenger_name, pickup_location, dropoff_location, booking_time, status,
-                                        hotel_group, flight_no, flight_time, room_no, car_type, first_call, second_call, 
-                                        vc_remark, job_remark, createdate, updatedate
-                                    ) VALUES (%s, %s, %s, %s, %s, 'Pending', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                                """
-                                cursor.execute(sql_insert, (
-                                    auto_voucher_no, passenger_name, pickup_location, dropoff_location, combined_datetime,
-                                    in_group, in_flight, parsed_f_time, in_room, in_type,
-                                    in_1st_call, in_2nd_call, in_vc_remark, in_job_remark, now, now
-                                ))
-                                db.commit()
-                                st.success(f"🎉 บันทึกการจองสำเร็จ! เลขใบงานใหม่: **{auto_voucher_no}**")
+            # คำนวณหาประเภทรถที่จะยัดลงฐานข้อมูล
+            final_car_type = custom_car_type if selected_car_type == "Other / กรอกประเภทรถอื่น" else selected_car_type
+            
+            with st.spinner("กำลังประมวลผลข้อมูล..."):
+                db = None
+                try:
+                    db = get_connection()
+                    now = dt_module.datetime.now()
+                    
+                    with db.cursor() as cursor:
+                        if is_edit_mode:
+                            sql_update = """
+                                UPDATE bookings SET
+                                    passenger_name = %s, pickup_location = %s, dropoff_location = %s, booking_time = %s,
+                                    hotel_group = %s, flight_no = %s, flight_time = %s, room_no = %s, car_type = %s, 
+                                    first_call = %s, second_call = %s, vc_remark = %s, job_remark = %s, updatedate = %s
+                                WHERE id = %s
+                            """
+                            cursor.execute(sql_update, (
+                                passenger_name, pickup_location, dropoff_location, combined_datetime,
+                                in_group, in_flight, in_flight_time_obj, in_room, final_car_type,
+                                in_1st_call, in_2nd_call, in_vc_remark, in_job_remark, now, target_booking_id
+                            ))
+                            db.commit()
+                            st.success(f"⚙️ อัปเดตข้อมูลใบงานเลขที่ **{init_voucher_no}** เรียบร้อยแล้ว!")
+                        else:
+                            year_month_str = now.strftime("%Y%m")
+                            cursor.execute("SELECT COUNT(*) FROM bookings WHERE voucher_no LIKE %s", (f"VC{year_month_str}%",))
+                            next_number = cursor.fetchone()[0] + 1
+                            auto_voucher_no = f"VC{year_month_str}{str(next_number).zfill(5)}"
                             
-                        st.rerun()
-                    except Exception as e: st.error(f"❌ เกิดข้อผิดพลาด: {e}")
-                    finally: 
-                        if db and db.open: db.close()
+                            sql_insert = """
+                                INSERT INTO bookings (
+                                    voucher_no, passenger_name, pickup_location, dropoff_location, booking_time, status,
+                                    hotel_group, flight_no, flight_time, room_no, car_type, first_call, second_call, 
+                                    vc_remark, job_remark, createdate, updatedate
+                                ) VALUES (%s, %s, %s, %s, %s, 'Pending', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            """
+                            cursor.execute(sql_insert, (
+                                auto_voucher_no, passenger_name, pickup_location, dropoff_location, combined_datetime,
+                                in_group, in_flight, in_flight_time_obj, in_room, final_car_type,
+                                in_1st_call, in_2nd_call, in_vc_remark, in_job_remark, now, now
+                            ))
+                            db.commit()
+                            st.success(f"🎉 บันทึกการจองสำเร็จ! เลขใบงานใหม่: **{auto_voucher_no}**")
+                            
+                    st.rerun()
+                except Exception as e: st.error(f"❌ เกิดข้อผิดพลาด: {e}")
+                finally: 
+                    if db and db.open: db.close()
 
     st.write("---")
     st.write("### 🚗 รายการงานจองปัจจุบันที่มีในระบบ")
     db = None
     try:
         db = get_connection()
-        # 💡 ข้อ 3: หน้า booker แสดงรายการพร้อมเวลาเดินทาง (booking_time) และเวลาอัปเดตล่าสุดเด่นชัด
+        # 💡 ข้อ 1 & 3: ปรับแต่งตาราง ดึงฟิลด์เวลาเดินทาง (booking_time), วันสร้าง (createdate) และวันแก้ไขล่าสุด (updatedate) มาแสดงผลให้ครบถ้วนและชัดเจน
         df_booker = pd.read_sql("""
             SELECT voucher_no AS 'Voucher', 
                    passenger_name AS 'ชื่อผู้โดยสาร', 
-                   DATE_FORMAT(booking_time, '%%d/%%m/%%Y %%H:%%i') AS 'วัน-เวลาเดินทาง',
+                   DATE_FORMAT(booking_time, '%%d/%%m/%%Y %%H:%%i') AS 'วัน-เวลาเดินทาง (ข้อ 1)',
                    hotel_group AS 'Group/โรงแรม',
                    flight_no AS 'Flight', 
-                   status AS 'สถานะงาน'
+                   status AS 'สถานะงาน',
+                   DATE_FORMAT(createdate, '%%d/%%m/%%Y %%H:%%i') AS 'วันที่สร้างใบงาน (createdate)',
+                   DATE_FORMAT(updatedate, '%%d/%%m/%%Y %%H:%%i') AS 'วันที่อัปเดต (updatedate)'
             FROM bookings WHERE status IN ('Pending', 'Assigned', 'Accepted') ORDER BY id DESC
         """, db)
         if not df_booker.empty: st.dataframe(df_booker, width='stretch', hide_index=True)
@@ -461,7 +467,7 @@ elif choice == "➕ Booker" and user_role in ["admin", "booker"]:
     except Exception as e: st.error(f"❌ ไม่สามารถดึงข้อมูลได้: {e}")
     finally: 
         if db and db.open: db.close()
-
+            
 elif choice == "🖥️ Dispatcher" and user_role in ["admin", "dispatcher"]:
     st.title("🎛️ แผงควบคุมและคีย์ข้อมูลสำหรับ Dispatcher")
     st.write("---")
