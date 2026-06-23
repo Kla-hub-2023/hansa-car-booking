@@ -233,44 +233,28 @@ if choice == "🏠 Dashboard" and user_role in ["admin", "dispatcher"]:
                     else: st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
 
 # =================================================================
-# ➕ 1. หน้าสำหรับ BOOKER (เวอร์ชันกดเลข Voucher เพื่อลิงก์แก้ไข)
+# ➕ 1. หน้าสำหรับ BOOKER (เวอร์ชันจิ้มเลือกแถวในตารางเพื่อแก้ไขทันที)
 # =================================================================
 elif choice == "➕ Booker":
     st.title("📋 ระบบจัดการงานจองรถ (ฝั่ง Booker)")
     
-    # 💡 ตรวจสอบว่ามีการคลิกลิงก์ Voucher มาจากในตารางหรือไม่
-    url_params = st.query_params
-    if "edit_voucher" in url_params:
-        v_no_target = url_params["edit_voucher"]
-        # ค้นหา ID ของใบงานจากเลข Voucher เพื่อสลับไปโหมดแก้ไข
-        try:
-            db = get_connection()
-            with db.cursor() as cursor:
-                cursor.execute("SELECT id FROM bookings WHERE voucher_no = %s", (v_no_target,))
-                res_b = cursor.fetchone()
-                if res_b:
-                    st.session_state.selected_booking_id = res_b[0]
-                    st.session_state.booker_mode = "edit"
-        except: pass
-        finally: db.close()
-
     if st.session_state.booker_mode == "list":
         st.subheader("รายการงานจองรอดำเนินการ (Status = 'Pending')")
+        st.caption("💡 วิธีแก้ไข: สามารถใช้นิ้วจิ้มเลือกแถวของงานที่ต้องการแก้ไขในตารางด้านล่างได้ทันที")
         
+        # ปุ่มสร้างรายการใหม่
         col_btn_new, _ = st.columns([1, 2])
         with col_btn_new:
             if st.button("➕ New (สร้างรายการใหม่)", use_container_width=True):
                 st.session_state.booker_mode = "create"
                 st.session_state.selected_booking_id = None
-                # ล้าง Parameter แก้ไขเดิมออกจาก URL ถ้ามี
-                if "edit_voucher" in st.query_params:
-                    del st.query_params["edit_voucher"]
                 st.rerun()
 
-        # ดึงข้อมูลจากฐานข้อมูลมารอแสดงผล
+        # ดึงข้อมูลจากฐานข้อมูลมารอดำเนินการ
         db = get_connection()
+        # ดึง id มาด้วยเพื่อใช้ในการอ้างอิงตอนแก้ไข แต่ซ่อนไว้ไม่ให้รกตา
         df_booker = pd.read_sql("""
-            SELECT voucher_no, voucher_no AS 'Voucher', passenger_name AS 'Guest Name', 
+            SELECT id, voucher_no AS 'Voucher', passenger_name AS 'Guest Name', 
                    hotel_group AS 'Hotel', DATE_FORMAT(booking_time, '%d/%m/%Y') AS 'Service Date',
                    DATE_FORMAT(booking_time, '%H:%M') AS 'Service Time'
             FROM bookings WHERE status = 'Pending' ORDER BY id DESC
@@ -278,28 +262,25 @@ elif choice == "➕ Booker":
         db.close()
         
         if not df_booker.empty:
-            # 💡 บิวด์ URL ของตัวแอปปัจจุบัน เพื่อนำมาสร้างเป็นลิงก์ Query Parameter
-            # (ระบบจะยิงกลับมาที่เว็บเดิมแต่พ่วงท้ายด้วย ?user=...&edit_voucher=เลขVoucher)
-            base_url = st.config.get_option("browser.gatherUsageStats") # หรือใส่ URL ของเว็บสตรีมลิตตรงๆ ได้ครับ เช่น "https://share.streamlit.io/..."
-            
-            # แปลงคอลัมน์ 'Voucher' ให้กลายเป็น Hyperlink เต็มรูปแบบ
-            user_p = f"user={st.session_state.default_user_id}&" if st.session_state.get("default_user_id") else ""
-            df_booker['Voucher'] = df_booker['voucher_no'].apply(lambda x: f"?{user_p}edit_voucher={x}")
-            
-            # แสดงผลด้วย st.data_editor และเปิดใช้งาน LinkColumn เพื่อให้คลิกได้จริงในตาราง
-            st.data_editor(
+            # ใช้ st.dataframe แบบเปิดฟังก์ชันจับการเลือกแถว (selection_mode="single_row")
+            event = st.dataframe(
                 df_booker[['Voucher', 'Guest Name', 'Hotel', 'Service Date', 'Service Time']],
                 use_container_width=True,
                 hide_index=True,
-                disabled=True, # ปิดการพิมพ์แก้ไขในเซลล์ธรรมดาเพื่อความปลอดภัย
-                column_config={
-                    "Voucher": st.column_config.LinkColumn(
-                        "เลข Voucher (คลิกเพื่อแก้ไข)",
-                        help="จิ้มที่รหัสใบงานชิ้นนี้เพื่อวิ่งไปเปิดฟอร์มแก้ไขข้อมูล",
-                        display_text=r"([^?]+)$" # ให้แสดงผลบนหน้าจอเป็นเลขรหัส Voucher สวยๆ เหมือนเดิม
-                    )
-                }
+                on_select="rerun",  # เมื่อคลิกเลือกแถว ให้สั่งรันโค้ดใหม่ทันที
+                selection_mode="single_row"  # เลือกได้ทีละ 1 แถวงาน
             )
+            
+            # ตรวจสอบว่าแอดมินคลิกเลือกแถวไหนในตารางหรือยัง
+            if event and "rows" in event["selection"] and event["selection"]["rows"]:
+                selected_row_index = event["selection"]["rows"][0]
+                # ดึง ID จริงของใบงานชิ้นนั้นออกมาจาก DataFrame
+                actual_id = int(df_booker.iloc[selected_row_index]['id'])
+                
+                # สั่งเปลี่ยนโหมดเปิดหน้าแก้ไขทันที!
+                st.session_state.selected_booking_id = actual_id
+                st.session_state.booker_mode = "edit"
+                st.rerun()
         else:
             st.info("ℹ️ ไม่มีใบงานสถานะ Pending ค้างอยู่ในระบบขณะนี้ครับ")
             
@@ -359,17 +340,11 @@ elif choice == "➕ Booker":
                                 WHERE id = %s
                             """, (p_name, p_pickup, p_dest, comb_dt, now, st.session_state.selected_booking_id))
                     db.commit(); db.close()
-                    
-                    # บันทึกเสร็จแล้วล้างค่า Query บน URL ออกให้สะอาด
-                    if "edit_voucher" in st.query_params:
-                        del st.query_params["edit_voucher"]
                     st.success("บันทึกข้อมูลเรียบร้อยแล้ว!")
                     st.session_state.booker_mode = "list"
                     st.rerun()
                     
             if btn_cancel:
-                if "edit_voucher" in st.query_params:
-                    del st.query_params["edit_voucher"]
                 st.session_state.booker_mode = "list"
                 st.rerun()
 # =================================================================
