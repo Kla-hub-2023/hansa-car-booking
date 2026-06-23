@@ -233,24 +233,48 @@ if choice == "🏠 Dashboard" and user_role in ["admin", "dispatcher"]:
                     else: st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
 
 # =================================================================
-# ➕ 1. หน้าสำหรับ BOOKER (เวอร์ชันเสถียร: แก้ไขปัญหาจิ้มแล้ว Error)
+# ➕ 1. หน้าสำหรับ BOOKER (เวอร์ชันเสถียรที่สุด 100% สำหรับมือถือ)
 # =================================================================
 elif choice == "➕ Booker":
     st.title("📋 ระบบจัดการงานจองรถ (ฝั่ง Booker)")
     
+    # 1. ดึงรายการ Pending ทั้งหมดมาทำระบบเลือกดึงข้อมูลแก้ไขแบบไร้บั๊ก
+    booking_dropdown_options = {}
+    try:
+        db = get_connection()
+        with db.cursor() as cursor:
+            cursor.execute("SELECT id, voucher_no, passenger_name FROM bookings WHERE status = 'Pending' ORDER BY id DESC")
+            all_b_pending = cursor.fetchall()
+            booking_dropdown_options = {f"🔗 [แก้ไข] {b[1]} - คุณ {b[2]}": b[0] for b in all_b_pending}
+    except Exception as e:
+        st.error(f"โหลดตัวเลือกแก้ไขผิดพลาด: {e}")
+    finally:
+        if db and db.open: db.close()
+
     if st.session_state.booker_mode == "list":
         st.subheader("รายการงานจองรอดำเนินการ (Status = 'Pending')")
-        st.caption("💡 **วิธีใช้งาน:** สามารถใช้นิ้วจิ้มเลือกแถวของงานที่ต้องการแก้ไขในตารางด้านล่างได้ทันที ระบบจะเปิดหน้าฟอร์มแก้ไขให้อัตโนมัติ")
         
-        # ปุ่มสร้างรายการใหม่
-        col_btn_new, _ = st.columns([1, 2])
+        # 1.3 ปุ่มสร้างรายการใหม่ (New Button)
+        col_btn_new, col_select_edit = st.columns([1, 2])
         with col_btn_new:
             if st.button("➕ New (สร้างรายการใหม่)", use_container_width=True):
                 st.session_state.booker_mode = "create"
                 st.session_state.selected_booking_id = None
                 st.rerun()
+                
+        with col_select_edit:
+            # 💡 ระบบสลับหน้าไปโหมดแก้ไขข้อมูลแบบปลอดภัย ไม่ผ่านการคลิกตารางให้พัง
+            if booking_dropdown_options:
+                chosen_edit = st.selectbox(
+                    "🎯 เลือกใบงานจองที่ต้องการแก้ไขข้อมูลด้านล่าง", 
+                    options=["-- เลือกใบงานเพื่อแก้ไข --"] + list(booking_dropdown_options.keys())
+                )
+                if chosen_edit != "-- เลือกใบงานเพื่อแก้ไข --":
+                    st.session_state.selected_booking_id = booking_dropdown_options[chosen_edit]
+                    st.session_state.booker_mode = "edit"
+                    st.rerun()
 
-        # ดึงข้อมูลจากฐานข้อมูลมารอแสดงผล
+        # 2. แสดงตารางสรุปผลข้อมูลหน้ารายการของ Booker
         db = get_connection()
         df_booker = pd.read_sql("""
             SELECT voucher_no AS 'Voucher', passenger_name AS 'Guest Name', 
@@ -261,36 +285,7 @@ elif choice == "➕ Booker":
         db.close()
         
         if not df_booker.empty:
-            # เรียกใช้งานตาราง st.dataframe แบบเปิด selection_mode
-            event = st.dataframe(
-                df_booker[['Voucher', 'Guest Name', 'Hotel', 'Service Date', 'Service Time']],
-                use_container_width=True,
-                hide_index=True,
-                on_select="rerun",  # เมื่อคลิกเลือกแถว ให้สั่งรันโค้ดใหม่ทันที
-                selection_mode="single_row"  # เลือกได้ทีละ 1 แถวงาน
-            )
-            
-            # ตรวจสอบโครงสร้างการเลือกแถวเพื่อป้องกัน Error จากการคลิก
-            if event and "rows" in event.get("selection", {}) and event["selection"]["rows"]:
-                selected_row_index = event["selection"]["rows"][0]
-                
-                # ดึงเลข Voucher ของแถวที่ถูกเลือกออกมาก่อน
-                selected_voucher = str(df_booker.iloc[selected_row_index]['Voucher']).strip()
-                
-                # ใช้เลข Voucher ค้นหา ID จริงจากฐานข้อมูลโดยตรงเพื่อความแม่นยำ 100%
-                db_search = get_connection()
-                try:
-                    with db_search.cursor() as cursor_search:
-                        cursor_search.execute("SELECT id FROM bookings WHERE voucher_no = %s", (selected_voucher,))
-                        res_search = cursor_search.fetchone()
-                        if res_search:
-                            st.session_state.selected_booking_id = int(res_search[0])
-                            st.session_state.booker_mode = "edit"
-                            st.rerun()
-                except Exception as e:
-                    st.error(f"เกิดข้อผิดพลาดในการดึงข้อมูลเพื่อแก้ไข: {e}")
-                finally:
-                    db_search.close()
+            st.dataframe(df_booker, use_container_width=True, hide_index=True)
         else:
             st.info("ℹ️ ไม่มีใบงานสถานะ Pending ค้างอยู่ในระบบขณะนี้ครับ")
             
@@ -357,6 +352,7 @@ elif choice == "➕ Booker":
             if btn_cancel:
                 st.session_state.booker_mode = "list"
                 st.rerun()
+                
 # =================================================================
 # 🖥️ 2. หน้าสำหรับ DISPATCHER
 # =================================================================
