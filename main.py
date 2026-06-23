@@ -233,14 +233,14 @@ if choice == "🏠 Dashboard" and user_role in ["admin", "dispatcher"]:
                     else: st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
 
 # =================================================================
-# ➕ 1. หน้าสำหรับ BOOKER (เวอร์ชันจิ้มเลือกแถวในตารางเพื่อแก้ไขทันที)
+# ➕ 1. หน้าสำหรับ BOOKER (เวอร์ชันเสถียร: แก้ไขปัญหาจิ้มแล้ว Error)
 # =================================================================
 elif choice == "➕ Booker":
     st.title("📋 ระบบจัดการงานจองรถ (ฝั่ง Booker)")
     
     if st.session_state.booker_mode == "list":
         st.subheader("รายการงานจองรอดำเนินการ (Status = 'Pending')")
-        st.caption("💡 วิธีแก้ไข: สามารถใช้นิ้วจิ้มเลือกแถวของงานที่ต้องการแก้ไขในตารางด้านล่างได้ทันที")
+        st.caption("💡 **วิธีใช้งาน:** สามารถใช้นิ้วจิ้มเลือกแถวของงานที่ต้องการแก้ไขในตารางด้านล่างได้ทันที ระบบจะเปิดหน้าฟอร์มแก้ไขให้อัตโนมัติ")
         
         # ปุ่มสร้างรายการใหม่
         col_btn_new, _ = st.columns([1, 2])
@@ -250,11 +250,10 @@ elif choice == "➕ Booker":
                 st.session_state.selected_booking_id = None
                 st.rerun()
 
-        # ดึงข้อมูลจากฐานข้อมูลมารอดำเนินการ
+        # ดึงข้อมูลจากฐานข้อมูลมารอแสดงผล
         db = get_connection()
-        # ดึง id มาด้วยเพื่อใช้ในการอ้างอิงตอนแก้ไข แต่ซ่อนไว้ไม่ให้รกตา
         df_booker = pd.read_sql("""
-            SELECT id, voucher_no AS 'Voucher', passenger_name AS 'Guest Name', 
+            SELECT voucher_no AS 'Voucher', passenger_name AS 'Guest Name', 
                    hotel_group AS 'Hotel', DATE_FORMAT(booking_time, '%d/%m/%Y') AS 'Service Date',
                    DATE_FORMAT(booking_time, '%H:%M') AS 'Service Time'
             FROM bookings WHERE status = 'Pending' ORDER BY id DESC
@@ -262,7 +261,7 @@ elif choice == "➕ Booker":
         db.close()
         
         if not df_booker.empty:
-            # ใช้ st.dataframe แบบเปิดฟังก์ชันจับการเลือกแถว (selection_mode="single_row")
+            # เรียกใช้งานตาราง st.dataframe แบบเปิด selection_mode
             event = st.dataframe(
                 df_booker[['Voucher', 'Guest Name', 'Hotel', 'Service Date', 'Service Time']],
                 use_container_width=True,
@@ -271,16 +270,27 @@ elif choice == "➕ Booker":
                 selection_mode="single_row"  # เลือกได้ทีละ 1 แถวงาน
             )
             
-            # ตรวจสอบว่าแอดมินคลิกเลือกแถวไหนในตารางหรือยัง
-            if event and "rows" in event["selection"] and event["selection"]["rows"]:
+            # ตรวจสอบโครงสร้างการเลือกแถวเพื่อป้องกัน Error จากการคลิก
+            if event and "rows" in event.get("selection", {}) and event["selection"]["rows"]:
                 selected_row_index = event["selection"]["rows"][0]
-                # ดึง ID จริงของใบงานชิ้นนั้นออกมาจาก DataFrame
-                actual_id = int(df_booker.iloc[selected_row_index]['id'])
                 
-                # สั่งเปลี่ยนโหมดเปิดหน้าแก้ไขทันที!
-                st.session_state.selected_booking_id = actual_id
-                st.session_state.booker_mode = "edit"
-                st.rerun()
+                # ดึงเลข Voucher ของแถวที่ถูกเลือกออกมาก่อน
+                selected_voucher = str(df_booker.iloc[selected_row_index]['Voucher']).strip()
+                
+                # ใช้เลข Voucher ค้นหา ID จริงจากฐานข้อมูลโดยตรงเพื่อความแม่นยำ 100%
+                db_search = get_connection()
+                try:
+                    with db_search.cursor() as cursor_search:
+                        cursor_search.execute("SELECT id FROM bookings WHERE voucher_no = %s", (selected_voucher,))
+                        res_search = cursor_search.fetchone()
+                        if res_search:
+                            st.session_state.selected_booking_id = int(res_search[0])
+                            st.session_state.booker_mode = "edit"
+                            st.rerun()
+                except Exception as e:
+                    st.error(f"เกิดข้อผิดพลาดในการดึงข้อมูลเพื่อแก้ไข: {e}")
+                finally:
+                    db_search.close()
         else:
             st.info("ℹ️ ไม่มีใบงานสถานะ Pending ค้างอยู่ในระบบขณะนี้ครับ")
             
