@@ -155,48 +155,45 @@
 
 // 💡 ฟังก์ชันควบคุมตอนกดปุ่ม "ส่งข้อมูล" (เวอร์ชันดักเคสลงทะเบียนซ้ำ)
     async function submitForm(event) {
-        event.preventDefault();
+    event.preventDefault();
+    
+    const name = document.getElementById('driverName').value.trim();
+    const phone = document.getElementById('driverPhone').value.trim(); // ดึงค่าเบอร์โทรเพิ่ม
+    const lineId = document.getElementById('lineUid').value.trim();
+    
+    if (!name || !phone || !lineId) {
+        alert("กรุณากรอกข้อมูลให้ครบถ้วนครับ");
+        return;
+    }
+
+    // 💡 ส่งพารามิเตอร์ &phone= พ่วงท้ายไปที่สะพานกูเกิลสคริปต์
+    const googleScriptUrl = `https://script.google.com/macros/s/AKfycbxq0ARfECWNpsFiKNxjyXAtv7zSk-GpkMDQVWI1z8LGsYbCEU3A2gyXReD-HWmus-yI/exec?name=${encodeURIComponent(name)}&phone=${encodeURIComponent(phone)}&line_id=${encodeURIComponent(lineId)}`;
+
+    try {
+        const response = await fetch(googleScriptUrl);
+        const result = await response.json();
         
-        const name = document.getElementById('driverName').value.trim();
-        const lineId = document.getElementById('lineUid').value.trim();
-        
-        if (!name || !lineId) {
-            alert("กรุณากรอกข้อมูลให้ครบถ้วนครับ");
-            return;
+        if (result.status === "duplicate") {
+            alert("⚠️ ขออภัยครับ! คุณเคยลงทะเบียนในระบบคิวรถ Hunsa เรียบร้อยแล้ว ไม่ต้องลงทะเบียนซ้ำครับ");
+        } else if (result.status === "success") {
+            alert("🎉 ลงทะเบียนสำเร็จเรียบร้อยแล้วครับ! ระบบจะปิดหน้าต่างนี้โดยอัตโนมัติ กรุณารอแอดมินกล้าอนุมัติสิทธิ์นะครับ");
+        } else {
+            alert("❌ เกิดข้อผิดพลาดทางเทคนิค กรุณาแจ้งแอดมินกล้าครับ");
         }
-
-        const googleScriptUrl = `https://script.google.com/macros/s/AKfycbxq0ARfECWNpsFiKNxjyXAtv7zSk-GpkMDQVWI1z8LGsYbCEU3A2gyXReD-HWmus-yI/exec?name=${encodeURIComponent(name)}&line_id=${encodeURIComponent(lineId)}`;
-
-        try {
-            // ปรับวิธีส่งจาก no-cors เป็น cors เพื่อให้หน้าบ้านสามารถอ่านคำตอบกลับจากกูเกิลได้ว่า "ซ้ำ" หรือไม่
-            const response = await fetch(googleScriptUrl);
-            const result = await response.json();
-            
-            if (result.status === "duplicate") {
-                // 🚨 กรณีตรวจเจอข้อมูลตัว U ซ้ำในฐานข้อมูล
-                alert("⚠️ ขออภัยครับ! คุณเคยลงทะเบียนในระบบคิวรถ Hunsa เรียบร้อยแล้ว ไม่ต้องลงทะเบียนซ้ำครับ");
-            } else if (result.status === "success") {
-                // 🎉 กรณีเป็นคนขับใหม่ ลงทะเบียนผ่านครั้งแรก
-                alert("🎉 ลงทะเบียนสำเร็จเรียบร้อยแล้วครับ! ระบบจะปิดหน้าต่างนี้โดยอัตโนมัติ กรุณารอแอดมินกล้าอนุมัติสิทธิ์นะครับ");
-            } else {
-                alert("❌ เกิดข้อผิดพลาดทางเทคนิค กรุณาแจ้งแอดมินกล้าครับ");
-            }
-            
-            // สั่งสลายตัวปิดหน้าต่าง LINE ทันทีในทั้งสองกรณี
-            setTimeout(() => {
-                if (typeof liff !== 'undefined' && liff.closeWindow) {
-                    liff.closeWindow();
-                }
-            }, 500);
-            
-        } catch (error) {
-            console.error("Submit Error:", error);
-            // เพื่อป้องกันหน้าจอค้าง หากระบบติดต่อหลังบ้านไม่ได้ ให้ปิดหน้าต่างเซฟไว้ก่อน
+        
+        setTimeout(() => {
             if (typeof liff !== 'undefined' && liff.closeWindow) {
                 liff.closeWindow();
             }
+        }, 500);
+        
+    } catch (error) {
+        console.error("Submit Error:", error);
+        if (typeof liff !== 'undefined' && liff.closeWindow) {
+            liff.closeWindow();
         }
     }
+}
 </script>
 
 </body>
