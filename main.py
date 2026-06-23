@@ -112,12 +112,13 @@ choice = st.sidebar.radio("เมนูใช้งาน", options=menu_options
 # --- 3. ส่วนควบคุมการแสดงหน้าจอแต่ละบทบาท ---
 
 # =================================================================
-# 🏠 0. หน้าสำหรับ DASHBOARD & USER MANAGEMENT
+# 🏠 0. หน้าสำหรับ DASHBOARD & USER MANAGEMENT (เวอร์ชันอัปเดตช่องเบอร์โทรศัพท์พนักงาน)
 # =================================================================
 if choice == "🏠 Dashboard" and user_role in ["admin", "dispatcher"]:
     st.title("🏠 Dashboard ระบบจัดการรถ Hunsa")
     st.write("---")
     
+    # ส่วนสรุปจำนวนงาน (Metrics)
     db = None
     try:
         db = get_connection()
@@ -133,12 +134,14 @@ if choice == "🏠 Dashboard" and user_role in ["admin", "dispatcher"]:
         col_m1.metric("⏳ งานรอจัดสรร (Pending)", count_pending)
         col_m2.metric("🚀 รถกำลังวิ่ง (Active)", count_active)
         col_m3.metric("🚖 คนขับในระบบทั้งหมด", count_drivers)
-    except Exception as e: st.error(f"Error Metric: {e}")
+    except Exception as e: 
+        st.error(f"Error Metric: {e}")
     finally: 
         if db and db.open: db.close()
 
+    # แสดงโซนจัดการสิทธิ์พนักงาน เฉพาะผู้ใช้ระดับ Admin เท่านั้น
     if user_role == "admin":
-        st.write("<br>", unsafe_allow_html=True)
+        st.write("<br><br>", unsafe_allow_html=True)
         st.title("👥 ระบบจัดการสิทธิ์ผู้ใช้งาน (User Management)")
         st.write("---")
         
@@ -147,13 +150,16 @@ if choice == "🏠 Dashboard" and user_role in ["admin", "dispatcher"]:
         try:
             db = get_connection()
             with db.cursor() as cursor:
-                cursor.execute("SELECT line_user_id, name, role, DATE_FORMAT(createdate, '%d/%m/%Y %H:%M') FROM users WHERE role = 'guest'")
+                # 💡 ดึงฟิลด์เบอร์โทรศัพท์พนักงานออกมาแสดงในตารางตรวจสอบด้วย
+                cursor.execute("SELECT line_user_id, name, phone_no, DATE_FORMAT(createdate, '%d/%m/%Y %H:%M') FROM users WHERE role = 'guest'")
                 guests_data = cursor.fetchall()
             if guests_data:
-                df_guests = pd.DataFrame(guests_data, columns=['รหัส LINE User ID', 'ชื่อรายงานตัวพนักงาน', 'สถานะ', 'วันที่สมัครเข้ามา'])
+                df_guests = pd.DataFrame(guests_data, columns=['รหัส LINE User ID', 'ชื่อรายงานตัวพนักงาน', 'เบอร์โทรศัพท์', 'วันที่สมัครเข้ามา'])
                 st.dataframe(df_guests, use_container_width=True, hide_index=True)
-            else: st.success("✨ เรียบร้อยดี! ไม่มีพนักงานใหม่ค้างรออนุมัติสิทธิ์ในระบบครับ")
-        except Exception as e: st.error(f"เกิดข้อผิดพลาดในการดึงข้อมูล Guest: {e}")
+            else: 
+                st.success("✨ เรียบร้อยดี! ไม่มีพนักงานใหม่ค้างรออนุมัติสิทธิ์ในระบบครับ")
+        except Exception as e: 
+            st.error(f"เกิดข้อผิดพลาดในการดึงข้อมูล Guest: {e}")
         finally:
             if db and db.open: db.close()
 
@@ -162,10 +168,12 @@ if choice == "🏠 Dashboard" and user_role in ["admin", "dispatcher"]:
         try:
             db = get_connection()
             with db.cursor() as cursor: 
-                cursor.execute("SELECT line_user_id, name, role, status FROM users")
+                # 💡 ดึงฟิลด์ phone_no ของทุกคนออกมาร่วมเตรียมหยอดลงกล่องอินพุต
+                cursor.execute("SELECT line_user_id, name, role, status, phone_no FROM users")
                 all_users = cursor.fetchall()
             user_list_options = {f"👤 {u[1]} ({u[2].upper()}) - [{u[3] if u[3] else 'Active'}]": u for u in all_users}
-        except Exception as e: st.error(f"ดึงข้อมูลผู้ใช้ล้มเหลว: {e}")
+        except Exception as e: 
+            st.error(f"ดึงข้อมูลผู้ใช้ล้มเหลว: {e}")
         finally:
             if db and db.open: db.close()
 
@@ -173,22 +181,28 @@ if choice == "🏠 Dashboard" and user_role in ["admin", "dispatcher"]:
         with col_form_edit:
             st.write("📝 **ระบบลงทะเบียน / แก้ไข และ ปรับสถานะพนักงาน**")
             select_user_action = st.selectbox("💡 เลือกพนักงานที่ต้องการแก้ไข", options=["➕ ลงทะเบียนพนักงานใหม่ / กรอกเอง"] + list(user_list_options.keys()))
-            init_id, init_name, init_role, init_status = "", "", "driver", "Active"
+            init_id, init_name, init_role, init_status, init_phone = "", "", "driver", "Active", ""
             
             if select_user_action != "➕ ลงทะเบียนพนักงานใหม่ / กรอกเอง":
                 user_data = user_list_options[select_user_action]
-                init_id, init_name = user_data[0], user_data[1]
+                init_id = user_data[0]
+                init_name = user_data[1]
                 init_role = user_data[2].lower() if user_data[2] else "driver"
                 init_status = user_data[3] if user_data[3] else "Active"
+                init_phone = user_data[4] if user_data[4] else "" # ดึงค่าเบอร์โทรเดิมจาก DB
 
             with st.form("user_management_form", clear_on_submit=False):
                 new_line_id = st.text_input("ระบุ LINE User ID", value=init_id).strip()
                 new_name = st.text_input("ระบุชื่อ-นามสกุลจริง ของพนักงาน", value=init_name).strip()
+                
+                # 💡 [เพิ่มใหม่] ช่องระบุเบอร์โทรศัพท์มือถือ สำหรับกรณีคนขับรถต้องการสลับสับเปลี่ยนเบอร์โทรในระบบ
+                new_phone = st.text_input("📱 เบอร์โทรศัพท์มือถือพนักงาน", value=init_phone, placeholder="เช่น 0812345678").strip()
+                
                 roles_pool = ["admin", "booker", "dispatcher", "driver", "airportstaff", "guest"]
                 new_role = st.selectbox("กำหนดตำแหน่ง (Role)", roles_pool, index=roles_pool.index(init_role) if init_role in roles_pool else 3)
                 status_pool = ["Active", "Inactive"]
                 new_status = st.radio("🚦 Status การใช้งานระบบ", status_pool, index=status_pool.index(init_status) if init_status in status_pool else 0, horizontal=True)
-                submit_user = st.form_submit_button("💾 อนุมัติและบันทึกสิทธิ์")
+                submit_user = st.form_submit_button("💾 อนุมัติและบันทึกสิทธิ์พนักงาน")
                 
                 if submit_user:
                     if new_line_id and new_name:
@@ -196,17 +210,21 @@ if choice == "🏠 Dashboard" and user_role in ["admin", "dispatcher"]:
                             conn = get_connection()
                             now_time = dt_module.datetime.now()
                             with conn.cursor() as cursor:
+                                # 💡 ทำการอัปเดตคอลัมน์ phone_no เพิ่มเติมเข้าคำสั่ง SQL ด้วยระบบ ON DUPLICATE KEY UPDATE
                                 sql = """
-                                    INSERT INTO users (line_user_id, name, role, status, createdate, updatedate) 
-                                    VALUES (%s, %s, %s, %s, %s, %s) 
-                                    ON DUPLICATE KEY UPDATE name = %s, role = %s, status = %s, updatedate = %s
+                                    INSERT INTO users (line_user_id, name, role, status, phone_no, createdate, updatedate) 
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s) 
+                                    ON DUPLICATE KEY UPDATE name = %s, role = %s, status = %s, phone_no = %s, updatedate = %s
                                 """
-                                cursor.execute(sql, (new_line_id, new_name, new_role, new_status, now_time, now_time, new_name, new_role, new_status, now_time))
+                                cursor.execute(sql, (new_line_id, new_name, new_role, new_status, new_phone, now_time, now_time, 
+                                                     new_name, new_role, new_status, new_phone, now_time))
                             conn.commit(); conn.close()
-                            st.success(f"🎉 บันทึกข้อมูลพนักงานเรียบร้อยแล้ว!")
+                            st.success(f"🎉 บันทึกข้อมูลพนักงานและอัปเดตเบอร์โทรศัพท์เรียบร้อยแล้ว!")
                             st.rerun()
-                        except Exception as e: st.error(f"❌ เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
-                    else: st.warning("⚠️ รบกวนกรอก LINE ID และชื่อพนักงานให้ครบถ้วนครับ")
+                        except Exception as e: 
+                            st.error(f"❌ เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
+                    else: 
+                        st.warning("⚠️ รบกวนกรอก LINE ID และชื่อพนักงานให้ครบถ้วนครับ")
 
         with col_form_del:
             st.write("❌ **โซนอันตราย**")
@@ -222,15 +240,18 @@ if choice == "🏠 Dashboard" and user_role in ["admin", "dispatcher"]:
                             conn = get_connection()
                             with conn.cursor() as cursor:
                                 cursor.execute("SELECT COUNT(*) FROM bookings WHERE driver_id = %s", (target_del_id,))
-                                if cursor.fetchone()[0] > 0: st.error("❌ ไม่สามารถลบได้ เนื่องจากมีประวัติการวิ่งงานในระบบแล้ว")
+                                if cursor.fetchone()[0] > 0: 
+                                    st.error("❌ ไม่สามารถลบได้ เนื่องจากมีประวัติการวิ่งงานในระบบแล้ว")
                                 else:
                                     cursor.execute("DELETE FROM users WHERE line_user_id = %s", (target_del_id,))
                                     conn.commit()
                                     st.success("🗑️ ลบข้อมูลพนักงานเรียบร้อยแล้ว!")
                                     st.rerun()
                             conn.close()
-                        except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
-                    else: st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
+                        except Exception as e: 
+                            st.error(f"เกิดข้อผิดพลาด: {e}")
+                    else: 
+                        st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
 
 # =================================================================
 # ➕ 1. หน้าสำหรับ BOOKER (เวอร์ชันเสถียรที่สุด 100% สำหรับมือถือ)
