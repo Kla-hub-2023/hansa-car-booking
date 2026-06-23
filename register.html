@@ -43,7 +43,7 @@
             font-size: 14px;
             margin-bottom: 25px;
         }
-        .form-group {
+        .mb-3 { /* เปลี่ยนชื่อเพื่อให้ตรงกับในฟอร์ม */
             margin-bottom: 20px;
         }
         label {
@@ -53,7 +53,8 @@
             font-weight: 600;
             font-size: 14px;
         }
-        input[type="text"] {
+        /* 🛠️ แก้ไขตรงนี้: เพิ่ม input[type="tel"] เข้าไปด้วย เพื่อให้กาง 100% เท่ากัน */
+        input[type="text"], input[type="tel"] {
             width: 100%;
             padding: 12px;
             border: 1px solid #cbd5e0;
@@ -63,7 +64,7 @@
             background-color: #f8fafc;
             transition: all 0.2s;
         }
-        input[type="text"]:focus {
+        input[type="text"]:focus, input[type="tel"]:focus {
             outline: none;
             border-color: #3182ce;
             background-color: #fff;
@@ -74,7 +75,8 @@
             color: #4a5568;
             cursor: not-allowed;
         }
-        .btn-submit {
+        /* 🛠️ แก้ไขตรงนี้: ปรับคลาสปุ่มให้ตรงกับที่คุณเรียกใช้ใน HTML (btn-success) */
+        .btn-success {
             width: 100%;
             padding: 14px;
             background-color: #2f855a;
@@ -87,7 +89,7 @@
             transition: background 0.2s;
             margin-top: 10px;
         }
-        .btn-submit:hover {
+        .btn-success:hover {
             background-color: #22543d;
         }
         #loading {
@@ -106,45 +108,36 @@
     
     <div id="loading">⏳ กำลังดึงรหัส LINE User ID ของคุณ...</div>
 
-<!-- 📝 ฟอร์มลงทะเบียนพนักงานใหม่ (เวอร์ชันจัดสไตล์ให้กางกว้างเต็มหน้าจอเท่ากันทุกช่อง) -->
-<form id="registerForm" onsubmit="submitForm(event)">
-    <div class="mb-3">
-        <label for="driverName" class="form-label" style="font-weight: bold;">👤 ชื่อ - นามสกุลจริง</label>
-        <input type="text" class="form-control" id="driverName" placeholder="เช่น นายสมชาย ใจดี" required>
-    </div>
-    
-    <div class="mb-3">
-        <label for="driverPhone" class="form-label" style="font-weight: bold;">📞 เบอร์โทรศัพท์มือถือ</label>
-        <!-- 💡 เพิ่มคลาส form-control เพื่อให้กางเต็ม 100% เท่ากับช่องด้านบน และเพิ่มการดีไซน์ฟอร์มให้อ่านง่าย -->
-        <input type="tel" class="form-control" id="driverPhone" placeholder="เช่น 0812345678" pattern="[0-9]{9,10}" title="กรุณากรอกเบอร์โทรศัพท์เป็นตัวเลข 9-10 หลัก" required>
-    </div>
+    <form id="registerForm" onsubmit="submitForm(event)">
+        <div class="mb-3">
+            <label for="driverName" class="form-label" style="font-weight: bold;">👤 ชื่อ - นามสกุลจริง</label>
+            <input type="text" class="form-control" id="driverName" placeholder="เช่น นายสมชาย ใจดี" required>
+        </div>
+        
+        <div class="mb-3">
+            <label for="driverPhone" class="form-label" style="font-weight: bold;">📞 เบอร์โทรศัพท์มือถือ</label>
+            <input type="tel" class="form-control" id="driverPhone" placeholder="เช่น 0812345678" pattern="[0-9]{9,10}" title="กรุณากรอกเบอร์โทรศัพท์เป็นตัวเลข 9-10 หลัก" required>
+        </div>
 
-    <div class="mb-3">
-        <label for="lineUid" class="form-label" style="font-weight: bold;">🔑 รหัส LINE User ID (ระบบดึงให้อัตโนมัติ)</label>
-        <input type="text" class="form-control" id="lineUid" style="background-color: #e9ecef; cursor: not-allowed;" readonly required>
-    </div>
+        <div class="mb-3">
+            <label for="lineUid" class="form-label" style="font-weight: bold;">🔑 รหัส LINE User ID (ระบบดึงให้อัตโนมัติ)</label>
+            <input type="text" class="form-control" id="lineUid" readonly required>
+        </div>
 
-    <!-- 💡 เติมคลาส btn btn-success w-100 เพื่อให้ปุ่มกดยาวเต็มหน้าจอ และหนาเด่นชัดสไตล์ Mobile-First -->
-    <button type="submit" class="btn btn-success w-100 py-2" style="font-weight: bold;">🚀 ส่งข้อมูลลงทะเบียนระบบคิวรถ</button>
-</form>
+        <button type="submit" class="btn btn-success" style="font-weight: bold;">🚀 ส่งข้อมูลลงทะเบียนระบบคิวรถ</button>
+    </form>
 </div>
 
 <script>
-    // 💡 สั่งให้ LINE LIFF ทำงานทันทีเมื่อเปิดหน้าเว็บ
+    // คงสคริปต์ LIFF เดิมของคุณไว้ได้เลยครับ...
     async function initLiff() {
         try {
-            // ปลุกระบบ LIFF ID ของแอดมิน (ใช้ตัวเดิมที่แอดมินสร้างไว้ได้เลย)
             await liff.init({ liffId: "2010148491-zYBksiiv" });
-            
             if (liff.isLoggedIn()) {
-                // ดึงข้อมูลโปรไฟล์ของคนที่กำลังเปิดเว็บ
                 const profile = await liff.getProfile();
-                // หยอดรหัสตัว U ลงไปในกล่องข้อความที่ 2 ทันที!
                 document.getElementById('lineUid').value = profile.userId;
-                // ซ่อนข้อความกำลังโหลด
                 document.getElementById('loading').style.display = 'none';
             } else {
-                // ถ้าเผลอไปเปิดนอกแอป LINE ให้ระบบบังคับล็อกอินเข้า LINE ก่อน
                 liff.login();
             }
         } catch (error) {
@@ -152,51 +145,46 @@
             document.getElementById('loading').innerText = "❌ เกิดข้อผิดพลาดในการดึงข้อมูล LINE";
         }
     }
-
-    // เรียกฟังก์ชันเมื่อเว็บโหลดเสร็จ
     initLiff();
 
-// 💡 ฟังก์ชันควบคุมตอนกดปุ่ม "ส่งข้อมูล" (เวอร์ชันดักเคสลงทะเบียนซ้ำ)
     async function submitForm(event) {
-    event.preventDefault();
-    
-    const name = document.getElementById('driverName').value.trim();
-    const phone = document.getElementById('driverPhone').value.trim(); // ดึงค่าเบอร์โทรเพิ่ม
-    const lineId = document.getElementById('lineUid').value.trim();
-    
-    if (!name || !phone || !lineId) {
-        alert("กรุณากรอกข้อมูลให้ครบถ้วนครับ");
-        return;
-    }
-
-    // 💡 ส่งพารามิเตอร์ &phone= พ่วงท้ายไปที่สะพานกูเกิลสคริปต์
-    const googleScriptUrl = `https://script.google.com/macros/s/AKfycbxq0ARfECWNpsFiKNxjyXAtv7zSk-GpkMDQVWI1z8LGsYbCEU3A2gyXReD-HWmus-yI/exec?name=${encodeURIComponent(name)}&phone=${encodeURIComponent(phone)}&line_id=${encodeURIComponent(lineId)}`;
-
-    try {
-        const response = await fetch(googleScriptUrl);
-        const result = await response.json();
+        event.preventDefault();
+        const name = document.getElementById('driverName').value.trim();
+        const phone = document.getElementById('driverPhone').value.trim();
+        const lineId = document.getElementById('lineUid').value.trim();
         
-        if (result.status === "duplicate") {
-            alert("⚠️ ขออภัยครับ! คุณเคยลงทะเบียนในระบบคิวรถ Hunsa เรียบร้อยแล้ว ไม่ต้องลงทะเบียนซ้ำครับ");
-        } else if (result.status === "success") {
-            alert("🎉 ลงทะเบียนสำเร็จเรียบร้อยแล้วครับ! ระบบจะปิดหน้าต่างนี้โดยอัตโนมัติ กรุณารอแอดมินกล้าอนุมัติสิทธิ์นะครับ");
-        } else {
-            alert("❌ เกิดข้อผิดพลาดทางเทคนิค กรุณาแจ้งแอดมินกล้าครับ");
+        if (!name || !phone || !lineId) {
+            alert("กรุณากรอกข้อมูลให้ครบถ้วนครับ");
+            return;
         }
-        
-        setTimeout(() => {
+
+        const googleScriptUrl = `https://script.google.com/macros/s/AKfycbxq0ARfECWNpsFiKNxjyXAtv7zSk-GpkMDQVWI1z8LGsYbCEU3A2gyXReD-HWmus-yI/exec?name=${encodeURIComponent(name)}&phone=${encodeURIComponent(phone)}&line_id=${encodeURIComponent(lineId)}`;
+
+        try {
+            const response = await fetch(googleScriptUrl);
+            const result = await response.json();
+            
+            if (result.status === "duplicate") {
+                alert("⚠️ ขออภัยครับ! คุณเคยลงทะเบียนในระบบคิวรถ Hunsa เรียบร้อยแล้ว ไม่ต้องลงทะเบียนซ้ำครับ");
+            } else if (result.status === "success") {
+                alert("🎉 ลงทะเบียนสำเร็จเรียบร้อยแล้วครับ! ระบบจะปิดหน้าต่างนี้โดยอัตโนมัติ กรุณารอแอดมินกล้าอนุมัติสิทธิ์นะครับ");
+            } else {
+                alert("❌ เกิดข้อผิดพลาดทางเทคนิค กรุณาแจ้งแอดมินกล้าครับ");
+            }
+            
+            setTimeout(() => {
+                if (typeof liff !== 'undefined' && liff.closeWindow) {
+                    liff.closeWindow();
+                }
+            }, 500);
+            
+        } catch (error) {
+            console.error("Submit Error:", error);
             if (typeof liff !== 'undefined' && liff.closeWindow) {
                 liff.closeWindow();
             }
-        }, 500);
-        
-    } catch (error) {
-        console.error("Submit Error:", error);
-        if (typeof liff !== 'undefined' && liff.closeWindow) {
-            liff.closeWindow();
         }
     }
-}
 </script>
 
 </body>
