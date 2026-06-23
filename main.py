@@ -75,9 +75,144 @@ choice = st.sidebar.radio("เมนูใช้งาน", options=menu_options
 # --- 3. ส่วนควบคุมการแสดงหน้าจอแต่ละบทบาท ---
 
 # =================================================================
+# 🏠 0. หน้าสำหรับ DASHBOARD & USER MANAGEMENT (คืนค่าระบบที่หายไป)
+# =================================================================
+if choice == "🏠 Dashboard" and user_role in ["admin", "dispatcher"]:
+    st.title("🏠 Dashboard ระบบจัดการรถ Hunsa")
+    st.write("---")
+    
+    # ส่วนสรุปจำนวนงาน (Metrics)
+    db = None
+    try:
+        db = get_connection()
+        with db.cursor() as cursor:
+            cursor.execute("SELECT COUNT(*) FROM bookings WHERE status = 'Pending'")
+            count_pending = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM bookings WHERE status IN ('Assigned', 'Accepted')")
+            count_active = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'driver'")
+            count_drivers = cursor.fetchone()[0]
+        
+        col_m1, col_m2, col_m3 = st.columns(3)
+        col_m1.metric("⏳ งานรอจัดสรร (Pending)", count_pending)
+        col_m2.metric("🚀 รถกำลังวิ่ง (Active)", count_active)
+        col_m3.metric("🚖 คนขับในระบบทั้งหมด", count_drivers)
+    except Exception as e: 
+        st.error(f"Error Metric: {e}")
+    finally: 
+        if db and db.open: db.close()
+
+    # แสดงโซนจัดการสิทธิ์พนักงาน เฉพาะผู้ใช้ระดับ Admin เท่านั้น
+    if user_role == "admin":
+        st.write("<br><br>", unsafe_allow_html=True)
+        st.title("👥 ระบบจัดการสิทธิ์ผู้ใช้งาน (User Management)")
+        st.write("---")
+        
+        st.write("### ⏳ รายชื่อพนักงานใหม่ที่รออนุมัติสิทธิ์ (Guests)")
+        db = None
+        try:
+            db = get_connection()
+            with db.cursor() as cursor:
+                cursor.execute("SELECT line_user_id, name, role, DATE_FORMAT(createdate, '%d/%m/%Y %H:%M') FROM users WHERE role = 'guest'")
+                guests_data = cursor.fetchall()
+            if guests_data:
+                df_guests = pd.DataFrame(guests_data, columns=['รหัส LINE User ID', 'ชื่อรายงานตัวพนักงาน', 'สถานะ', 'วันที่สมัครเข้ามา'])
+                st.dataframe(df_guests, use_container_width=True, hide_index=True)
+            else: 
+                st.success("✨ เรียบร้อยดี! ไม่มีพนักงานใหม่ค้างรออนุมัติสิทธิ์ในระบบครับ")
+        except Exception as e: 
+            st.error(f"เกิดข้อผิดพลาดในการดึงข้อมูล Guest: {e}")
+        finally:
+            if db and db.open: db.close()
+
+        st.write("---")
+        user_list_options = {}
+        try:
+            db = get_connection()
+            with db.cursor() as cursor: 
+                cursor.execute("SELECT line_user_id, name, role, status FROM users")
+                all_users = cursor.fetchall()
+            user_list_options = {f"👤 {u[1]} ({u[2].upper()}) - [{u[3] if u[3] else 'Active'}]": u for u in all_users}
+        except Exception as e: 
+            st.error(f"ดึงข้อมูลผู้ใช้ล้มเหลว: {e}")
+        finally:
+            if db and db.open: db.close()
+
+        col_form_edit, col_form_del = st.columns([2, 1])
+
+        with col_form_edit:
+            st.write("📝 **ระบบลงทะเบียน / แก้ไข และ ปรับสถานะพนักงาน**")
+            select_user_action = st.selectbox("💡 เลือกพนักงานที่ต้องการแก้ไข (หรือเลือกเพิ่มคนใหม่)", options=["➕ ลงทะเบียนพนักงานใหม่ / กรอกเอง"] + list(user_list_options.keys()))
+            init_id, init_name, init_role, init_status = "", "", "driver", "Active"
+            
+            if select_user_action != "➕ ลงทะเบียนพนักงานใหม่ / กรอกเอง":
+                user_data = user_list_options[select_user_action]
+                init_id, init_name = user_data[0], user_data[1]
+                init_role = user_data[2].lower() if user_data[2] else "driver"
+                init_status = user_data[3] if user_data[3] else "Active"
+
+            with st.form("user_management_form", clear_on_submit=False):
+                new_line_id = st.text_input("ระบุ LINE User ID", value=init_id).strip()
+                new_name = st.text_input("ระบุชื่อ-นามสกุลจริง ของพนักงาน", value=init_name).strip()
+                roles_pool = ["admin", "booker", "dispatcher", "driver", "airportstaff", "guest"]
+                new_role = st.selectbox("กำหนดตำแหน่ง (Role)", roles_pool, index=roles_pool.index(init_role) if init_role in roles_pool else 3)
+                status_pool = ["Active", "Inactive"]
+                new_status = st.radio("🚦 Status การใช้งานระบบ", status_pool, index=status_pool.index(init_status) if init_status in status_pool else 0, horizontal=True)
+                submit_user = st.form_submit_button("💾 อนุมัติและบันทึกสิทธิ์")
+                
+                if submit_user:
+                    if new_line_id and new_name:
+                        try:
+                            conn = get_connection()
+                            now_time = dt_module.datetime.now()
+                            with conn.cursor() as cursor:
+                                sql = """
+                                    INSERT INTO users (line_user_id, name, role, status, createdate, updatedate) 
+                                    VALUES (%s, %s, %s, %s, %s, %s) 
+                                    ON DUPLICATE KEY UPDATE name = %s, role = %s, status = %s, updatedate = %s
+                                """
+                                cursor.execute(sql, (new_line_id, new_name, new_role, new_status, now_time, now_time, new_name, new_role, new_status, now_time))
+                            conn.commit()
+                            conn.close()
+                            st.success(f"🎉 บันทึกข้อมูลและอัปเดตสถานะพนักงานเรียบร้อยแล้ว!")
+                            st.rerun()
+                        except Exception as e: 
+                            st.error(f"❌ เกิดข้อผิดพลาดทางฐานข้อมูล: {e}")
+                    else: 
+                        st.warning("⚠️ รบกวนกรอก LINE ID และชื่อพนักงานให้ครบถ้วนครับ")
+
+        with col_form_del:
+            st.write("❌ **โซนอันตราย: ลบพนักงานออกจากระบบ**")
+            with st.form("user_delete_form"):
+                user_to_delete = st.selectbox("เลือกรายชื่อที่จะลบทิ้งเด็ดขาด", options=list(user_list_options.keys()))
+                confirm_delete = st.checkbox("⚠️ ยืนยันว่าต้องการลบข้อมูลพนักงานคนนี้จริง ๆ")
+                btn_delete = st.form_submit_button("🗑️ ลบพนักงานออกถาวร")
+                
+                if btn_delete:
+                    if confirm_delete and user_to_delete:
+                        target_del_id = user_list_options[user_to_delete][0]
+                        target_del_name = user_list_options[user_to_delete][1]
+                        try:
+                            conn = get_connection()
+                            with conn.cursor() as cursor:
+                                cursor.execute("SELECT COUNT(*) FROM bookings WHERE driver_id = %s", (target_del_id,))
+                                if cursor.fetchone()[0] > 0:
+                                    st.error(f"❌ ไม่สามารถลบคุณ {target_del_name} ได้ เนื่องจากมีประวัติการวิ่งงานในระบบแล้ว")
+                                else:
+                                    cursor.execute("DELETE FROM users WHERE line_user_id = %s", (target_del_id,))
+                                    conn.commit()
+                                    st.success(f"🗑️ ลบข้อมูลพนักงานเรียบร้อยแล้ว!")
+                                    st.rerun()
+                            conn.close()
+                        except Exception as e: 
+                            st.error(f"เกิดข้อผิดพลาด: {e}")
+                    else: 
+                        st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
+
+# =================================================================
 # ➕ 1. หน้าสำหรับ BOOKER
 # =================================================================
-if choice == "➕ Booker":
+elif choice == "➕ Booker":
     st.title("📋 ระบบจัดการงานจองรถ (ฝั่ง Booker)")
     
     if st.session_state.booker_mode == "list":
@@ -309,7 +444,7 @@ elif choice == "🖥️ Dispatcher" and user_role in ["admin", "dispatcher"]:
                 with col_dp_f1:
                     submit_disp = st.form_submit_button("💾 บันทึกจัดสรรงานและส่งมอบให้คนขับรถ")
                 with col_dp_f2:
-                    cancel_disp = st.form_submit_button("🔙 ย้อนกลับ")
+                    cancel_disp = st.form_submit_button("🗑️ ย้อนกลับ")
                     
                 if submit_disp:
                     final_agency = custom_agency if sel_agency == "อื่นๆ / คีย์ระบุเอง" else sel_agency
@@ -342,7 +477,6 @@ elif choice == "🖥️ Dispatcher" and user_role in ["admin", "dispatcher"]:
 elif choice == "✈️ Airport Staff":
     st.title("✈️ ตรวจสอบสถานะรถภาคพื้นดิน (Airport Rep)")
     db = get_connection()
-    # ดึงเฉพาะช่องข้อมูลฟิลด์ที่กำหนดตามเงื่อนไขข้อ 4
     df_rep = pd.read_sql("""
         SELECT passenger_name AS 'Guest Name', flight_no AS 'Flight No.',
                driver_name_text AS 'Driver Name', mobile_no AS 'Tel.',
@@ -371,7 +505,6 @@ elif choice == "🚖 งานของฉัน (Driver)":
     st.title("🚖 บอร์ดงานคิวรถสำหรับพนักงานขับรถ (Driver)")
     
     db = get_connection()
-    # ดึงงานที่มอบหมายให้พนักงานขับรถคนปัจจุบัน
     df_drv_jobs = pd.read_sql("""
         SELECT id, voucher_no, passenger_name, pickup_location, dropoff_location,
                DATE_FORMAT(booking_time, '%H:%M') AS s_time, DATE_FORMAT(booking_time, '%d-%m-%Y') AS s_date,
@@ -381,11 +514,9 @@ elif choice == "🚖 งานของฉัน (Driver)":
     db.close()
     
     if not df_drv_jobs.empty:
-        # ออกแบบหน้าสไตล์ Mobile-First เลียนแบบโครงสร้างจากรูปภาพ image_1b7877.png 
         for index, row in df_drv_jobs.iterrows():
             status_tag = "รอดำเนินการ" if row['status'] == 'Assigned' else 'รับทราบงานแล้ว'
             
-            # บล็อกจำลองสไตล์สีกล่องการ์ดแนวโทนแอปคิวรถแท็กซี่พรีเมียมตามสั่ง
             st.markdown(f"""
             <div style="background-color: #212529; border-radius: 12px; padding: 15px; margin-bottom: 15px; border-left: 8px solid #ffc107; color: white;">
                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #6c757d; padding-bottom: 5px;">
@@ -408,7 +539,6 @@ elif choice == "🚖 งานของฉัน (Driver)":
             </div>
             """, unsafe_allow_html=True)
             
-            # ปุ่มกดยืนยันการเคลียร์สถานะใต้การ์ด
             if row['status'] == 'Assigned':
                 if st.button(f"✅ กดรับทราบและยอมรับงานใบงาน {row['voucher_no']}", key=f"drv_ack_{row['id']}"):
                     db_ack = get_connection()
@@ -428,9 +558,7 @@ elif choice == "📝 ลงทะเบียนพนักงานใหม�
     
     with st.form("register_form_new_patch"):
         reg_name = st.text_input("กรุณากรอก ชื่อ - นามสกุลจริงของคุณ")
-        # 3.2 บล็อก line_user_id ให้แสดงผลอ่านได้อย่างเดียว ห้ามแก้ไข (Disabled Input)
         reg_line_id = st.text_input("รหัส LINE User ID ของคุณ (ดึงระบบอัตโนมัติ ห้ามแก้ไข)", value=current_id, disabled=True)
-        # 3.1 เพิ่มฟิลด์เบอร์โทรศัพท์ตามสั่ง
         reg_phone = st.text_input("ระบุเบอร์โทรศัพท์มือถือสายตรงของคุณ (ฟิลด์ใหม่ 📞)", placeholder="เช่น 089-xxxxxxx")
         
         btn_reg_submit = st.form_submit_button("🚀 บันทึกส่งข้อมูลสมัครเข้าตารางระบบ")
