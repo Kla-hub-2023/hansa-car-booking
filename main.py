@@ -375,7 +375,7 @@ elif choice == "➕ Booker":
                 st.rerun()
                 
 # =================================================================
-# 🖥️ 2. หน้าสำหรับ DISPATCHER
+# 🖥️ 2. หน้าสำหรับ DISPATCHER (เวอร์ชันซ่อมแซมระบดึงเบอร์โทรศัพท์อัตโนมัติ)
 # =================================================================
 elif choice == "🖥️ Dispatcher" and user_role in ["admin", "dispatcher"]:
     st.title("🎛️ แผงควบคุมงานสำหรับ Dispatcher")
@@ -415,6 +415,9 @@ elif choice == "🖥️ Dispatcher" and user_role in ["admin", "dispatcher"]:
                     if st.button("🛠️ จัดการคีย์ข้อมูล / แก้ไขใบงาน", key=f"dp_edit_{row['id']}"):
                         st.session_state.selected_booking_id = int(row['id'])
                         st.session_state.dispatcher_mode = "edit"
+                        
+                        # เคลียร์ state เก่าของคนขับออกเมื่อกดเปิดงานชิ้นใหม่
+                        if "selected_driver_name" in st.session_state: del st.session_state.selected_driver_name
                         st.rerun()
         else:
             st.info("✨ ไม่มีรายการงานรอดำเนินการตกค้างในระบบ")
@@ -422,25 +425,53 @@ elif choice == "🖥️ Dispatcher" and user_role in ["admin", "dispatcher"]:
     elif st.session_state.dispatcher_mode == "edit":
         st.subheader("🛠️ หน้าแก้ไขและมอบหมายคนขับโดยละเอียด (Dispatcher)")
         
+        # ดึงข้อมูลใบงาน และรายชื่อ Driver พร้อมเบอร์โทรและทะเบียนรถจากฐานข้อมูล
         db = get_connection()
         with db.cursor(pymysql.cursors.DictCursor) as cursor:
             cursor.execute("SELECT * FROM bookings WHERE id = %s", (st.session_state.selected_booking_id,))
             b_data = cursor.fetchone()
+            # ดึง phone_no ออกมาด้วย
             cursor.execute("SELECT name, phone_no FROM users WHERE role = 'driver' AND status = 'Active'")
             drivers_list = cursor.fetchall()
         db.close()
         
-        driver_phones = {d['name']: d['phone_no'] for d in drivers_list}
+        # จัดแจงดิกชันนารีจับคู่ชื่อคนขับกับเบอร์โทรศัพท์
+        driver_phones = {d['name']: (d['phone_no'] if d['phone_no'] else "") for d in drivers_list}
         driver_names_pool = ["-- โปรดเลือกคนขับรถ --"] + list(driver_phones.keys())
         
         if b_data:
+            st.write("### 🚖 ข้อมูลคนขับรถปฏิบัติงาน")
+            
+            # ตั้งค่าเริ่มต้นของ Driver ถ้าใบงานนั้นเคยเลือกไว้แล้ว
+            init_driver_idx = 0
+            if b_data['driver_name_text'] in driver_names_pool:
+                init_driver_idx = driver_names_pool.index(b_data['driver_name_text'])
+                
+            # 💡 [จุดสำคัญ] ย้ายตัวเลือกชื่อคนขับออกนอก st.form เพื่อให้ตรวจจับการเลือกเพื่ออัปเดตเบอร์โทรออโต้ทันที
+            selected_driver = st.selectbox(
+                "🧑 เลือก Driver Name (พนักงานคนขับ)", 
+                options=driver_names_pool, 
+                index=init_driver_idx,
+                key="dispatcher_select_driver_widget"
+            )
+            
+            # คำนวณเบอร์โทรศัพท์ที่จะเอามาใส่ในกล่องออโต้
+            if selected_driver != "-- โปรดเลือกคนขับรถ --":
+                auto_phone_val = driver_phones.get(selected_driver, "")
+            else:
+                auto_phone_val = b_data['mobile_no'] if b_data['mobile_no'] else ""
+
+            # ฟอร์มข้อมูลรายละเอียดใบงานหลัก
             with st.form("dispatcher_advanced_form"):
+                st.write("### 🎫 รายละเอียดข้อมูลและเส้นทางใบงาน")
+                
                 agency_choices = ["Bell transport", "VIG", "Courtyard SVB", "137 Pillars", "Trikaya", "อื่นๆ / คีย์ระบุเอง"]
                 init_agency = b_data['hotel_group'] if b_data['hotel_group'] else "Bell transport"
                 sel_agency = st.selectbox("Group Agency", options=agency_choices, index=agency_choices.index(init_agency) if init_agency in agency_choices else 5)
                 
                 custom_agency = ""
-                if sel_agency == "อื่นๆ / คีย์ระบุเอง": custom_agency = st.text_input("ระบุ Group Agency เพิ่มเติม")
+                if sel_agency == "อื่นๆ / คีย์ระบุเอง": 
+                    custom_agency = st.text_input("ระบุ Group Agency เพิ่มเติม")
                     
                 in_hotel = st.text_input("Hotel", value=b_data['pickup_location'] if b_data['pickup_location'] else "")
                 in_s_date = st.date_input("Service Date", value=b_data['booking_time'].date() if b_data['booking_time'] else dt_module.date.today())
@@ -456,34 +487,41 @@ elif choice == "🖥️ Dispatcher" and user_role in ["admin", "dispatcher"]:
                 in_2nd = st.text_input("2nd Call", value=b_data['second_call'] if b_data['second_call'] else "")
                 
                 service_type_options = ["1. From Airport", "2. To Airport", "3. One Way", "4. Round Trip", "5. By Hour"]
-                sel_service_type = st.selectbox("Service Type 🔽", options=service_type_options)
+                init_service_idx = 0
+                if b_data['job_type'] in service_type_options:
+                    init_service_idx = service_type_options.index(b_data['job_type'])
+                sel_service_type = st.selectbox("Service Type 🔽", options=service_type_options, index=init_service_idx)
                 
-                in_airport, in_flight, in_room = "", "", ""
-                if "1. From Airport" in sel_service_type:
-                    in_airport = st.text_input("🛫 Airport")
-                    in_flight = st.text_input("✈️ Flight No.")
-                elif "2. To Airport" in sel_service_type:
-                    in_airport = st.text_input("🛫 Airport")
-                    in_flight = st.text_input("✈️ Flight No.")
-                    in_room = st.text_input("🔑 Room No.")
+                in_airport = st.text_input("🛫 Airport", value=b_data['airport_name'] if b_data['airport_name'] else "")
+                in_flight = st.text_input("✈️ Flight No.", value=b_data['flight_no'] if b_data['flight_no'] else "")
+                in_room = st.text_input("🔑 Room No.", value=b_data['room_no'] if b_data['room_no'] else "")
                     
                 in_remark = st.text_area("Remark (หมายเหตุ)", value=b_data['job_remark'] if b_data['job_remark'] else "")
                 in_vc_remark = st.text_area("VC Remark", value=b_data['vc_remark'] if b_data['vc_remark'] else "")
                 
-                sel_drv_name = st.selectbox("Driver Name", options=driver_names_pool)
-                auto_phone_val = driver_phones.get(sel_drv_name, "") if sel_drv_name != "-- โปรดเลือกคนขับรถ --" else ""
-                in_tel = st.text_input("Tel. (ดึงขึ้นให้อัตโนมัติ)", value=auto_phone_val)
+                # 💡 [ปรับแต่งให้เรียบร้อย] นำตัวแปรเบอร์โทรที่ดึงออโต้ไปผูกไว้กับ key ประจำชื่อคนขับ 
+                # ทำให้เวลากดสลับชื่อคนขับ ค่าเบอร์โทรศัพท์ในช่องนี้จะเด้งเปลี่ยนตามอย่างแม่นยำ
+                in_tel = st.text_input(
+                    "Tel. (ดึงจากฐานข้อมูลให้อัตโนมัติ)", 
+                    value=auto_phone_val,
+                    key=f"tel_input_field_{selected_driver}"
+                )
                 in_plate = st.text_input("Plate No.", value=b_data['car_plate'] if b_data['car_plate'] else "")
                 
                 col_dp_f1, col_dp_f2 = st.columns(2)
-                with col_dp_f1: submit_disp = st.form_submit_button("💾 บันทึกจัดสรรงานและส่งมอบ")
-                with col_dp_f2: cancel_disp = st.form_submit_button("🔙 ย้อนกลับ")
+                with col_dp_f1: 
+                    submit_disp = st.form_submit_button("💾 บันทึกจัดสรรงานและส่งมอบ")
+                with col_dp_f2: 
+                    cancel_disp = st.form_submit_button("🔙 ย้อนกลับ")
                     
                 if submit_disp:
                     final_agency = custom_agency if sel_agency == "อื่นๆ / คีย์ระบุเอง" else sel_agency
                     db_save = get_connection()
                     now_t = dt_module.datetime.now()
                     comb_dt = dt_module.datetime.combine(in_s_date, in_s_time)
+                    
+                    # ตรวจสอบตัวแปรชื่อคนขับจากภายนอกฟอร์ม
+                    final_driver_name = selected_driver if selected_driver != "-- โปรดเลือกคนขับรถ --" else ""
                     
                     with db_save.cursor() as cursor_up:
                         cursor_up.execute("""
@@ -494,7 +532,7 @@ elif choice == "🖥️ Dispatcher" and user_role in ["admin", "dispatcher"]:
                                 mobile_no = %s, car_plate = %s, status = 'Assigned', updatedate = %s
                             WHERE id = %s
                         """, (final_agency, in_hotel, comb_dt, in_car_type, in_guest, in_dest, in_1st, in_2nd, sel_service_type, 
-                              in_airport, in_flight, in_room, in_remark, in_vc_remark, sel_drv_name, in_tel, in_plate, now_t, st.session_state.selected_booking_id))
+                              in_airport, in_flight, in_room, in_remark, in_vc_remark, final_driver_name, in_tel, in_plate, now_t, st.session_state.selected_booking_id))
                     db_save.commit(); db_save.close()
                     st.success("📝 อัปเดตข้อมูลและกระจายงานเข้าสมาร์ทโฟนเสร็จสิ้น!")
                     st.session_state.dispatcher_mode = "list"
