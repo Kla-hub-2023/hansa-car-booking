@@ -337,7 +337,19 @@ elif choice == "➕ Booker":
             # 🔽 ช่องที่เพิ่มใหม่สำหรับฝั่ง Booker
             car_choices = ["Camry", "Commuter", "E-Class", "S-Class", "V-Class", "Alphard", "BMW"]
             p_car_type = st.selectbox("Car Types. 🔽", options=car_choices)
-            p_flight = st.text_input("Flight no. (เที่ยวบิน)", value=curr_b['flight_no'] if st.session_state.booker_mode == "edit" and curr_b.get('flight_no') else "")
+            # 💡 ดักจับ Session State เพื่อสะท้อนข้อความตัวพิมพ์ใหญ่ลงในช่องพิมพ์ทันที
+            if "bk_flight_upper" not in st.session_state:
+                st.session_state.bk_flight_upper = curr_b['flight_no'] if st.session_state.booker_mode == "edit" and curr_b.get('flight_no') else ""
+
+            p_flight = st.text_input(
+                "Flight no. (เที่ยวบิน)", 
+                value=st.session_state.bk_flight_upper,
+                key="bk_flight_input_widget"
+            )
+            # แปลงค่าเป็นตัวใหญ่ทันทีและอัปเดตลงฟอร์มอย่างสดใหม่
+            if p_flight != st.session_state.bk_flight_upper:
+                st.session_state.bk_flight_upper = p_flight.upper().strip()
+                st.rerun()
             
             p_pickup = st.text_input("Pickup (จุดรับ)", value=init_pick)
             p_dest = st.text_input("Destination (จุดส่ง)", value=init_dest)
@@ -485,7 +497,19 @@ elif choice == "🖥️ Dispatcher" and user_role in ["admin", "dispatcher"]:
                 sel_service_type = st.selectbox("Service Type 🔽", options=service_type_options, index=init_service_idx)
                 
                 in_airport = st.text_input("🛫 Airport", value=b_data['airport_name'] if b_data['airport_name'] else "")
-                in_flight = st.text_input("✈️ Flight No.", value=b_data['flight_no'] if b_data['flight_no'] else "")
+                # 💡 ดักจับ Session State ของฝั่ง Dispatcher เพื่อแปลงตัวพิมพ์ใหญ่สดๆ คาช่องพิมพ์
+                if "dp_flight_upper" not in st.session_state:
+                    st.session_state.dp_flight_upper = b_data['flight_no'] if b_data['flight_no'] else ""
+
+                in_flight = st.text_input(
+                    "✈️ Flight No.", 
+                    value=st.session_state.dp_flight_upper,
+                    key="dp_flight_input_widget"
+                )
+                # เมื่อเปลี่ยนค่าในช่องปุ๊บ ระบบจะดีดค่าให้กลายเป็นตัวพิมพ์ใหญ่โชว์บนหน้าจอทันที
+                if in_flight != st.session_state.dp_flight_upper:
+                    st.session_state.dp_flight_upper = in_flight.upper().strip()
+                    st.rerun()
                 in_room = st.text_input("🔑 Room No.", value=b_data['room_no'] if b_data['room_no'] else "")
                 in_remark = st.text_area("Remark (หมายเหตุ)", value=b_data['job_remark'] if b_data['job_remark'] else "")
                 in_vc_remark = st.text_area("VC Remark", value=b_data['vc_remark'] if b_data['vc_remark'] else "")
