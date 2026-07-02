@@ -486,6 +486,15 @@ elif choice == "🖥️ Dispatcher" and user_role in ["admin", "dispatcher"]:
             if b_data['driver_name_text'] in driver_names_pool:
                 init_driver_idx = driver_names_pool.index(b_data['driver_name_text'])
 
+            # 💡 1. สร้างฟังก์ชันแปลงเที่ยวบินเป็นตัวใหญ่แบบ Callback ป้องกัน Infinite Rerun ลูปพัง
+            def uppercase_flight_dispatcher():
+                if "dp_flight_raw" in st.session_state and st.session_state.dp_flight_raw:
+                    st.session_state.dp_flight_upper = st.session_state.dp_flight_raw.upper().strip()
+
+            # ตั้งค่าเริ่มต้นประทับลง Session State ความปลอดภัย
+            if "dp_flight_upper" not in st.session_state:
+                st.session_state.dp_flight_upper = b_data['flight_no'] if b_data['flight_no'] else ""
+
             # ================= Group 1: ข้อมูลใบงานหลักและการเดินทาง =================
             with st.form("dispatcher_group_1"):
                 st.markdown("### 🎫 1. ข้อมูลใบงานหลักและการเดินทาง")
@@ -522,26 +531,23 @@ elif choice == "🖥️ Dispatcher" and user_role in ["admin", "dispatcher"]:
                 sel_service_type = st.selectbox("Service Type 🔽", options=service_type_options, index=init_service_idx)
                 
                 in_airport = st.text_input("🛫 Airport", value=b_data['airport_name'] if b_data['airport_name'] else "")
-                # 💡 ดักจับ Session State ของฝั่ง Dispatcher เพื่อแปลงตัวพิมพ์ใหญ่สดๆ คาช่องพิมพ์
-                if "dp_flight_upper" not in st.session_state:
-                    st.session_state.dp_flight_upper = b_data['flight_no'] if b_data['flight_no'] else ""
-
-                in_flight = st.text_input(
+                
+                # 💡 2. ผูกช่องรับข้อมูลเข้ากับระบบ Callback และ Key เพื่อดักเปลี่ยนตัวพิมพ์ใหญ่ทันทีโดยไม่ค้าง
+                st.text_input(
                     "✈️ Flight No.", 
                     value=st.session_state.dp_flight_upper,
-                    key="dp_flight_input_widget"
+                    key="dp_flight_raw",
+                    on_change=uppercase_flight_dispatcher
                 )
-                # เมื่อเปลี่ยนค่าในช่องปุ๊บ ระบบจะดีดค่าให้กลายเป็นตัวพิมพ์ใหญ่โชว์บนหน้าจอทันที
-                if in_flight != st.session_state.dp_flight_upper:
-                    st.session_state.dp_flight_upper = in_flight.upper().strip()
-                    st.rerun()
+                final_disp_flight = st.session_state.dp_flight_upper
+                
                 in_room = st.text_input("🔑 Room No.", value=b_data['room_no'] if b_data['room_no'] else "")
                 in_remark = st.text_area("Remark (หมายเหตุ)", value=b_data['job_remark'] if b_data['job_remark'] else "")
                 in_vc_remark = st.text_area("VC Remark", value=b_data['vc_remark'] if b_data['vc_remark'] else "")
                 st.form_submit_button("⏩ ถัดไป (จัดสรรคนขับ)")
 
             st.write("---")
-            # 💡 [อยู่เหนือกลุ่มสุดท้าย] ตัวเลือก Driver Name วางอยู่นอกฟอร์มเพื่อตรวจจับการเปลี่ยนค่าออโต้
+            # ตัวเลือก Driver Name วางอยู่นอกกลุ่มฟอร์มสุดท้ายเพื่อทำระบบดึงเบอร์โทรศัพท์ตามชื่อออโต้
             selected_driver = st.selectbox(
                 "🧑 เลือก Driver Name (พนักงานคนขับรถ)", 
                 options=driver_names_pool, 
@@ -573,9 +579,6 @@ elif choice == "🖥️ Dispatcher" and user_role in ["admin", "dispatcher"]:
                     comb_dt = dt_module.datetime.combine(in_s_date, in_s_time)
                     final_driver_name = selected_driver if selected_driver != "-- โปรดเลือกคนขับรถ --" else ""
                     
-                    # 💡 [จุดสำคัญ] ดักจับและบังคับให้ Flight No. ของฝั่ง Dispatcher เปลี่ยนเป็นตัวพิมพ์ใหญ่ทั้งหมดเสมอก่อนบันทึกทับข้อมูล
-                    final_disp_flight = in_flight.upper().strip() if in_flight else ""
-                    
                     with db_save.cursor() as cursor_up:
                         cursor_up.execute("""
                             UPDATE bookings SET 
@@ -587,7 +590,18 @@ elif choice == "🖥️ Dispatcher" and user_role in ["admin", "dispatcher"]:
                         """, (final_agency, in_hotel, comb_dt, in_car_type, in_guest, in_dest, in_1st, in_2nd, sel_service_type, 
                               in_airport, final_disp_flight, in_room, in_remark, in_vc_remark, final_driver_name, in_tel, in_plate, now_t, st.session_state.selected_booking_id))
                     db_save.commit(); db_save.close()
+                    
+                    # ล้างเคลียร์ State ข้อมูลเที่ยวบินเก่าออกเพื่อป้องกันการค้างไปงานชิ้นอื่น
+                    if "dp_flight_upper" in st.session_state: del st.session_state.dp_flight_upper
+                    if "dp_flight_raw" in st.session_state: del st.session_state.dp_flight_raw
+                    
                     st.success("📝 อัปเดตข้อมูลและกระจายงานเข้าสมาร์ทโฟนเสร็จสิ้น!")
+                    st.session_state.dispatcher_mode = "list"
+                    st.rerun()
+                    
+                if cancel_disp:
+                    if "dp_flight_upper" in st.session_state: del st.session_state.dp_flight_upper
+                    if "dp_flight_raw" in st.session_state: del st.session_state.dp_flight_raw
                     st.session_state.dispatcher_mode = "list"
                     st.rerun()
 
