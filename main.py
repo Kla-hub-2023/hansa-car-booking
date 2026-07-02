@@ -358,6 +358,10 @@ elif choice == "➕ Booker":
                     db = get_connection()
                     now = dt_module.datetime.now()
                     comb_dt = dt_module.datetime.combine(c_date, c_time)
+                    
+                    # 💡 [จุดสำคัญ] ดักจับและบังคับให้ Flight No. เปลี่ยนเป็นตัวพิมพ์ใหญ่ทั้งหมดเสมอก่อนลงฐานข้อมูล
+                    final_flight_no = p_flight.upper().strip() if p_flight else ""
+                    
                     with db.cursor() as cursor:
                         if st.session_state.booker_mode == "create":
                             year_month_str = now.strftime("%Y%m")
@@ -367,12 +371,12 @@ elif choice == "➕ Booker":
                             cursor.execute("""
                                 INSERT INTO bookings (voucher_no, passenger_name, car_type, flight_no, pickup_location, dropoff_location, booking_time, job_remark, status, createdate, updatedate)
                                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'Pending', %s, %s)
-                            """, (auto_voucher_no, p_name, p_car_type, p_flight, p_pickup, p_dest, comb_dt, p_remark, now, now))
+                            """, (auto_voucher_no, p_name, p_car_type, final_flight_no, p_pickup, p_dest, comb_dt, p_remark, now, now))
                         else:
                             cursor.execute("""
                                 UPDATE bookings SET passenger_name = %s, car_type = %s, flight_no = %s, pickup_location = %s, dropoff_location = %s, booking_time = %s, job_remark = %s, updatedate = %s
                                 WHERE id = %s
-                            """, (p_name, p_car_type, p_flight, p_pickup, p_dest, comb_dt, p_remark, now, st.session_state.selected_booking_id))
+                            """, (p_name, p_car_type, final_flight_no, p_pickup, p_dest, comb_dt, p_remark, now, st.session_state.selected_booking_id))
                     db.commit(); db.close()
                     st.success("บันทึกข้อมูลเรียบร้อยแล้ว!")
                     st.session_state.booker_mode = "list"
@@ -520,6 +524,9 @@ elif choice == "🖥️ Dispatcher" and user_role in ["admin", "dispatcher"]:
                     comb_dt = dt_module.datetime.combine(in_s_date, in_s_time)
                     final_driver_name = selected_driver if selected_driver != "-- โปรดเลือกคนขับรถ --" else ""
                     
+                    # 💡 [จุดสำคัญ] ดักจับและบังคับให้ Flight No. ของฝั่ง Dispatcher เปลี่ยนเป็นตัวพิมพ์ใหญ่ทั้งหมดเสมอก่อนบันทึกทับข้อมูล
+                    final_disp_flight = in_flight.upper().strip() if in_flight else ""
+                    
                     with db_save.cursor() as cursor_up:
                         cursor_up.execute("""
                             UPDATE bookings SET 
@@ -529,13 +536,9 @@ elif choice == "🖥️ Dispatcher" and user_role in ["admin", "dispatcher"]:
                                 mobile_no = %s, car_plate = %s, status = 'Assigned', updatedate = %s
                             WHERE id = %s
                         """, (final_agency, in_hotel, comb_dt, in_car_type, in_guest, in_dest, in_1st, in_2nd, sel_service_type, 
-                              in_airport, in_flight, in_room, in_remark, in_vc_remark, final_driver_name, in_tel, in_plate, now_t, st.session_state.selected_booking_id))
+                              in_airport, final_disp_flight, in_room, in_remark, in_vc_remark, final_driver_name, in_tel, in_plate, now_t, st.session_state.selected_booking_id))
                     db_save.commit(); db_save.close()
                     st.success("📝 อัปเดตข้อมูลและกระจายงานเข้าสมาร์ทโฟนเสร็จสิ้น!")
-                    st.session_state.dispatcher_mode = "list"
-                    st.rerun()
-                    
-                if cancel_disp:
                     st.session_state.dispatcher_mode = "list"
                     st.rerun()
 
