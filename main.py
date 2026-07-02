@@ -254,7 +254,7 @@ if choice == "🏠 Dashboard" and user_role in ["admin", "dispatcher"]:
                         st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
 
 # =================================================================
-# ➕ 1. หน้าสำหรับ BOOKER (เวอร์ชันเสถียรที่สุด 100% สำหรับมือถือ)
+# ➕ 1. หน้าสำหรับ BOOKER (เวอร์ชันเสถียรที่สุด 100% แก้บั๊กลูปค้าง)
 # =================================================================
 elif choice == "➕ Booker":
     st.title("📋 ระบบจัดการงานจองรถ (ฝั่ง Booker)")
@@ -281,6 +281,10 @@ elif choice == "➕ Booker":
             if st.button("➕ New (สร้างรายการใหม่)", use_container_width=True):
                 st.session_state.booker_mode = "create"
                 st.session_state.selected_booking_id = None
+                
+                # ล้างค่า State เที่ยวบินเก่าออกให้สะอาดก่อนคีย์งานใหม่
+                if "bk_flight_upper" in st.session_state: del st.session_state.bk_flight_upper
+                if "bk_flight_raw" in st.session_state: del st.session_state.bk_flight_raw
                 st.rerun()
                 
         with col_select_edit:
@@ -293,6 +297,10 @@ elif choice == "➕ Booker":
                 if chosen_edit != "-- เลือกใบงานเพื่อแก้ไข --":
                     st.session_state.selected_booking_id = booking_dropdown_options[chosen_edit]
                     st.session_state.booker_mode = "edit"
+                    
+                    # ล้างค่า State ชั่วคราวเพื่อให้ระบบโหลดค่าใหม่จากฐานข้อมูลมาใช้งาน
+                    if "bk_flight_upper" in st.session_state: del st.session_state.bk_flight_upper
+                    if "bk_flight_raw" in st.session_state: del st.session_state.bk_flight_raw
                     st.rerun()
 
         # 2. แสดงตารางสรุปผลข้อมูลหน้ารายการของ Booker
@@ -316,6 +324,8 @@ elif choice == "➕ Booker":
         init_pass, init_pick, init_dest = "", "", ""
         init_date = dt_module.date.today()
         init_time = dt_module.time(12, 0)
+        init_car_type = "Camry"
+        init_remark = ""
         
         if st.session_state.booker_mode == "edit":
             db = get_connection()
@@ -327,37 +337,44 @@ elif choice == "➕ Booker":
                 init_pass = curr_b['passenger_name']
                 init_pick = curr_b['pickup_location']
                 init_dest = curr_b['dropoff_location']
+                init_car_type = curr_b['car_type'] if curr_b['car_type'] else "Camry"
+                init_remark = curr_b['job_remark'] if curr_b['job_remark'] else ""
                 if curr_b['booking_time']:
                     init_date = curr_b['booking_time'].date()
                     init_time = curr_b['booking_time'].time()
 
+        # 💡 1. สร้างฟังก์ชันแปลงตัวใหญ่แบบ Callback วางไว้ก่อนเข้าเซกชันฟอร์ม
+        def uppercase_flight_booker():
+            if "bk_flight_raw" in st.session_state and st.session_state.bk_flight_raw:
+                st.session_state.bk_flight_upper = st.session_state.bk_flight_raw.upper().strip()
+
+        # กำหนดค่าเริ่มต้นของ Flight Upper ใน State
+        if "bk_flight_upper" not in st.session_state:
+            st.session_state.bk_flight_upper = curr_b['flight_no'] if st.session_state.booker_mode == "edit" and curr_b and curr_b.get('flight_no') else ""
+
         with st.form("booker_form"):
             p_name = st.text_input("Guest Name (ชื่อผู้โดยสาร)", value=init_pass)
             
-            # 🔽 ช่องที่เพิ่มใหม่สำหรับฝั่ง Booker
+            # 🔽 ช่องที่เพิ่มใหม่สำหรับฝั่ง Booker พร้อมหยอดค่าเริ่มต้นกรณีโหมดแก้ไข
             car_choices = ["Camry", "Commuter", "E-Class", "S-Class", "V-Class", "Alphard", "BMW"]
-            p_car_type = st.selectbox("Car Types. 🔽", options=car_choices)
-            # 💡 ดักจับ Session State เพื่อสะท้อนข้อความตัวพิมพ์ใหญ่ลงในช่องพิมพ์ทันที
-            if "bk_flight_upper" not in st.session_state:
-                st.session_state.bk_flight_upper = curr_b['flight_no'] if st.session_state.booker_mode == "edit" and curr_b.get('flight_no') else ""
-
-            p_flight = st.text_input(
+            p_car_type = st.selectbox("Car Types. 🔽", options=car_choices, index=car_choices.index(init_car_type) if init_car_type in car_choices else 0)
+            
+            # 💡 2. ผูกไอเทม text_input เข้ากับระบบ Callback เพื่อบังคับดีดเป็นตัวพิมพ์ใหญ่โดยไม่ทำระบบวนลูป
+            st.text_input(
                 "Flight no. (เที่ยวบิน)", 
                 value=st.session_state.bk_flight_upper,
-                key="bk_flight_input_widget"
+                key="bk_flight_raw",
+                on_change=uppercase_flight_booker
             )
-            # แปลงค่าเป็นตัวใหญ่ทันทีและอัปเดตลงฟอร์มอย่างสดใหม่
-            if p_flight != st.session_state.bk_flight_upper:
-                st.session_state.bk_flight_upper = p_flight.upper().strip()
-                st.rerun()
+            final_flight_no = st.session_state.bk_flight_upper
             
             p_pickup = st.text_input("Pickup (จุดรับ)", value=init_pick)
             p_dest = st.text_input("Destination (จุดส่ง)", value=init_dest)
             
             c_date = st.date_input("Service Date (วันที่เดินทาง)", value=init_date)
-            c_time = st.time_input("Time. (เวลาเดินทาง)", value=init_time, step=60) # แก้ไข Label เป็น Time.
+            c_time = st.time_input("Time. (เวลาเดินทาง)", value=init_time, step=60)
             
-            p_remark = st.text_area("Remark (หมายเหตุ)", value=curr_b['job_remark'] if st.session_state.booker_mode == "edit" and curr_b.get('job_remark') else "")
+            p_remark = st.text_area("Remark (หมายเหตุ)", value=init_remark)
             
             col_frm_b1, col_frm_b2 = st.columns(2)
             with col_frm_b1: btn_save = st.form_submit_button("💾 บันทึกข้อมูล")
@@ -370,9 +387,6 @@ elif choice == "➕ Booker":
                     db = get_connection()
                     now = dt_module.datetime.now()
                     comb_dt = dt_module.datetime.combine(c_date, c_time)
-                    
-                    # 💡 [จุดสำคัญ] ดักจับและบังคับให้ Flight No. เปลี่ยนเป็นตัวพิมพ์ใหญ่ทั้งหมดเสมอก่อนลงฐานข้อมูล
-                    final_flight_no = p_flight.upper().strip() if p_flight else ""
                     
                     with db.cursor() as cursor:
                         if st.session_state.booker_mode == "create":
@@ -390,9 +404,20 @@ elif choice == "➕ Booker":
                                 WHERE id = %s
                             """, (p_name, p_car_type, final_flight_no, p_pickup, p_dest, comb_dt, p_remark, now, st.session_state.selected_booking_id))
                     db.commit(); db.close()
+                    
+                    # เคลียร์ State ข้อมูลเที่ยวบินเก่าออกเพื่อป้องกันการค้างไปใบงานอื่น
+                    if "bk_flight_upper" in st.session_state: del st.session_state.bk_flight_upper
+                    if "bk_flight_raw" in st.session_state: del st.session_state.bk_flight_raw
+                    
                     st.success("บันทึกข้อมูลเรียบร้อยแล้ว!")
                     st.session_state.booker_mode = "list"
                     st.rerun()
+                    
+            if btn_cancel:
+                if "bk_flight_upper" in st.session_state: del st.session_state.bk_flight_upper
+                if "bk_flight_raw" in st.session_state: del st.session_state.bk_flight_raw
+                st.session_state.booker_mode = "list"
+                st.rerun()
                 
 # =================================================================
 # 🖥️ 2. หน้าสำหรับ DISPATCHER (เวอร์ชันซ่อมแซมระบดึงเบอร์โทรศัพท์อัตโนมัติ)
