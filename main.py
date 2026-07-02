@@ -254,7 +254,7 @@ if choice == "🏠 Dashboard" and user_role in ["admin", "dispatcher"]:
                         st.warning("⚠️ โปรดติ๊กเครื่องหมายถูกเพื่อยืนยันก่อนกดปุ่มลบครับ")
 
 # =================================================================
-# ➕ 1. หน้าสำหรับ BOOKER (เวอร์ชันเสถียรที่สุด 100% แก้บั๊กลูปค้าง)
+# ➕ 1. หน้าสำหรับ BOOKER (เวอร์ชันสมบูรณ์ แก้ปัญหา Syntax Indentation)
 # =================================================================
 elif choice == "➕ Booker":
     st.title("📋 ระบบจัดการงานจองรถ (ฝั่ง Booker)")
@@ -281,14 +281,9 @@ elif choice == "➕ Booker":
             if st.button("➕ New (สร้างรายการใหม่)", use_container_width=True):
                 st.session_state.booker_mode = "create"
                 st.session_state.selected_booking_id = None
-                
-                # ล้างค่า State เที่ยวบินเก่าออกให้สะอาดก่อนคีย์งานใหม่
-                if "bk_flight_upper" in st.session_state: del st.session_state.bk_flight_upper
-                if "bk_flight_raw" in st.session_state: del st.session_state.bk_flight_raw
                 st.rerun()
                 
         with col_select_edit:
-            # 💡 ระบบสลับหน้าไปโหมดแก้ไขข้อมูลแบบปลอดภัย ไม่ผ่านการคลิกตารางให้พัง
             if booking_dropdown_options:
                 chosen_edit = st.selectbox(
                     "🎯 เลือกใบงานจองที่ต้องการแก้ไขข้อมูลด้านล่าง", 
@@ -297,10 +292,6 @@ elif choice == "➕ Booker":
                 if chosen_edit != "-- เลือกใบงานเพื่อแก้ไข --":
                     st.session_state.selected_booking_id = booking_dropdown_options[chosen_edit]
                     st.session_state.booker_mode = "edit"
-                    
-                    # ล้างค่า State ชั่วคราวเพื่อให้ระบบโหลดค่าใหม่จากฐานข้อมูลมาใช้งาน
-                    if "bk_flight_upper" in st.session_state: del st.session_state.bk_flight_upper
-                    if "bk_flight_raw" in st.session_state: del st.session_state.bk_flight_raw
                     st.rerun()
 
         # 2. แสดงตารางสรุปผลข้อมูลหน้ารายการของ Booker
@@ -319,15 +310,6 @@ elif choice == "➕ Booker":
             st.info("ℹ️ ไม่มีใบงานสถานะ Pending ค้างอยู่ในระบบขณะนี้ครับ")
             
     elif st.session_state.booker_mode in ["create", "edit"]:
-        st.subheader("📝 ฟอร์มบันทึกข้อมูลใบงานจองรถ")
-        
-        init_pass, init_pick, init_dest = "", "", ""
-        init_date = dt_module.date.today()
-        init_time = dt_module.time(12, 0)
-        init_car_type = "Camry"
-        init_remark = ""
-        
-        elif st.session_state.booker_mode in ["create", "edit"]:
         st.subheader("📝 ฟอร์มบันทึกข้อมูลใบงานจองรถ")
         
         init_pass, init_pick, init_dest = "", "", ""
@@ -354,16 +336,13 @@ elif choice == "➕ Booker":
                     init_date = curr_b['booking_time'].date()
                     init_time = curr_b['booking_time'].time()
 
-        # ฟอร์ม Booker (ถอด on_change และ Callback ออกทั้งหมดเพื่อแก้ Error จากรูป 114134.jpg)
         with st.form("booker_form"):
             p_name = st.text_input("Guest Name (ชื่อผู้โดยสาร)", value=init_pass)
             
             car_choices = ["Camry", "Commuter", "E-Class", "S-Class", "V-Class", "Alphard", "BMW"]
             p_car_type = st.selectbox("Car Types. 🔽", options=car_choices, index=car_choices.index(init_car_type) if init_car_type in car_choices else 0)
             
-            # 💡 เปลี่ยนเป็นช่องข้อความปกติ ไม่ใส่ Callback ในฟอร์มตามกฎ Streamlit
             p_flight = st.text_input("Flight no. (เที่ยวบิน)", value=init_flight)
-            
             p_pickup = st.text_input("Pickup (จุดรับ)", value=init_pick)
             p_dest = st.text_input("Destination (จุดส่ง)", value=init_dest)
             
@@ -384,7 +363,6 @@ elif choice == "➕ Booker":
                     now = dt_module.datetime.now()
                     comb_dt = dt_module.datetime.combine(c_date, c_time)
                     
-                    # 💡 [ทางออกชี้ขาด] ทำการแปลง Flight No. เป็นตัวพิมพ์ใหญ่ที่บรรทัดนี้ตอนกดบันทึกแทน! สะอาด ปลอดภัย ชัวร์ 100%
                     final_flight_no = p_flight.upper().strip() if p_flight else ""
                     
                     with db.cursor() as cursor:
