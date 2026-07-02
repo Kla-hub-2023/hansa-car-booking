@@ -456,14 +456,7 @@ elif choice == "🖥️ Dispatcher" and user_role in ["admin", "dispatcher"]:
             if b_data['driver_name_text'] in driver_names_pool:
                 init_driver_idx = driver_names_pool.index(b_data['driver_name_text'])
 
-            # 💡 1. สร้างฟังก์ชันแปลงเที่ยวบินเป็นตัวใหญ่แบบ Callback ป้องกัน Infinite Rerun ลูปพัง
-            def uppercase_flight_dispatcher():
-                if "dp_flight_raw" in st.session_state and st.session_state.dp_flight_raw:
-                    st.session_state.dp_flight_upper = st.session_state.dp_flight_raw.upper().strip()
-
-            # ตั้งค่าเริ่มต้นประทับลง Session State ความปลอดภัย
-            if "dp_flight_upper" not in st.session_state:
-                st.session_state.dp_flight_upper = b_data['flight_no'] if b_data['flight_no'] else ""
+            init_flight_no = b_data['flight_no'] if b_data['flight_no'] else ""
 
             # ================= Group 1: ข้อมูลใบงานหลักและการเดินทาง =================
             with st.form("dispatcher_group_1"):
@@ -502,14 +495,8 @@ elif choice == "🖥️ Dispatcher" and user_role in ["admin", "dispatcher"]:
                 
                 in_airport = st.text_input("🛫 Airport", value=b_data['airport_name'] if b_data['airport_name'] else "")
                 
-                # 💡 2. ผูกช่องรับข้อมูลเข้ากับระบบ Callback และ Key เพื่อดักเปลี่ยนตัวพิมพ์ใหญ่ทันทีโดยไม่ค้าง
-                st.text_input(
-                    "✈️ Flight No.", 
-                    value=st.session_state.dp_flight_upper,
-                    key="dp_flight_raw",
-                    on_change=uppercase_flight_dispatcher
-                )
-                final_disp_flight = st.session_state.dp_flight_upper
+                # 💡 ถอดคำสั่ง on_change และระบบ key ลูปวนออกทั้งหมดเพื่อแก้ไข Error เรื่อง Submit Button
+                in_flight = st.text_input("✈️ Flight No.", value=init_flight_no)
                 
                 in_room = st.text_input("🔑 Room No.", value=b_data['room_no'] if b_data['room_no'] else "")
                 in_remark = st.text_area("Remark (หมายเหตุ)", value=b_data['job_remark'] if b_data['job_remark'] else "")
@@ -549,6 +536,9 @@ elif choice == "🖥️ Dispatcher" and user_role in ["admin", "dispatcher"]:
                     comb_dt = dt_module.datetime.combine(in_s_date, in_s_time)
                     final_driver_name = selected_driver if selected_driver != "-- โปรดเลือกคนขับรถ --" else ""
                     
+                    # 💡 แปลง Flight No. ของฝั่ง Dispatcher เป็นตัวพิมพ์ใหญ่ทั้งหมดตอนกดบันทึกที่บรรทัดนี้แทน
+                    final_disp_flight = in_flight.upper().strip() if in_flight else ""
+                    
                     with db_save.cursor() as cursor_up:
                         cursor_up.execute("""
                             UPDATE bookings SET 
@@ -560,18 +550,11 @@ elif choice == "🖥️ Dispatcher" and user_role in ["admin", "dispatcher"]:
                         """, (final_agency, in_hotel, comb_dt, in_car_type, in_guest, in_dest, in_1st, in_2nd, sel_service_type, 
                               in_airport, final_disp_flight, in_room, in_remark, in_vc_remark, final_driver_name, in_tel, in_plate, now_t, st.session_state.selected_booking_id))
                     db_save.commit(); db_save.close()
-                    
-                    # ล้างเคลียร์ State ข้อมูลเที่ยวบินเก่าออกเพื่อป้องกันการค้างไปงานชิ้นอื่น
-                    if "dp_flight_upper" in st.session_state: del st.session_state.dp_flight_upper
-                    if "dp_flight_raw" in st.session_state: del st.session_state.dp_flight_raw
-                    
                     st.success("📝 อัปเดตข้อมูลและกระจายงานเข้าสมาร์ทโฟนเสร็จสิ้น!")
                     st.session_state.dispatcher_mode = "list"
                     st.rerun()
                     
                 if cancel_disp:
-                    if "dp_flight_upper" in st.session_state: del st.session_state.dp_flight_upper
-                    if "dp_flight_raw" in st.session_state: del st.session_state.dp_flight_raw
                     st.session_state.dispatcher_mode = "list"
                     st.rerun()
 
